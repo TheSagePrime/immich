@@ -41,6 +41,7 @@ All fork migrations are newer than the last official `v3.4.2` migration,
 | ------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------- | ---------------- |
 | `1795470129477-AddLibraryWritable`                      | foundation | Adds `library.writable boolean NOT NULL DEFAULT false`                                                          | Drops the column |
 | `1795560000000-AddAssetOwnerIdOriginalPathPatternIndex` | folders    | Adds the index `asset_ownerId_originalPath_pattern_idx` on `asset ("ownerId", "originalPath" text_pattern_ops)` | Drops the index  |
+| `1795600000000-AddUploadSessionTable`                   | uploads    | Adds the `upload_session` table (resumable folder uploads)                                                      | Drops the table  |
 
 ## Rolling back to the official v3.4.2 images
 
@@ -90,7 +91,8 @@ Files written to disk by fork features stay on disk.
 | Library "writable" | Administration > External Libraries > library > Edit | off      | Lets fork features write files inside the library's first import path |
 | Start page         | Account Settings > Features > Folders                | Timeline | `navigation.startPage` preference: `timeline` or `folders`            |
 
-The foundation adds no environment variables.
+The foundation adds no environment variables. Folder uploads add none either; their limits are listed in
+"Reliable folder uploads" below.
 
 ## Foundation
 
@@ -203,6 +205,77 @@ database. See "Rolling back to the official v3.4.2 images" above.
   them for a minute.
 - File rename is available from the selection bar when exactly one asset of a writable folder is selected.
 
+## Reliable folder uploads
+
+Whole folders can be uploaded from the browser into a folder of a writable library, keeping the folder structure. The
+existing upload (`POST /assets`, used by the mobile apps) is unchanged.
+
+### Using it
+
+- **Upload folder** in the top bar (shown only when the signed-in user owns at least one writable library) opens the
+  browser's folder picker. Dropping a folder anywhere on the page does the same; the drop overlay now covers the whole
+  window. Dropping plain files keeps the old behaviour.
+- The dialog asks for the destination (library, then a folder inside it; new sub-folders can be added) and what to do
+  when a file already exists: **skip** the new file, **keep both** (the new file is stored as `name (1).ext`,
+  `name (2).ext`, ...) or **mark it as failed**. Before starting it shows how many files already exist there.
+- The folder upload panel (bottom left) shows overall and per-file progress, speed and time remaining, and the outcome
+  of every file (uploaded, renamed, skipped, failed, cancelled). Single files or all files can be cancelled; failed
+  files can be retried one by one or with **Retry all failed**.
+- Files are sent in 8 MB chunks, three files at a time. A dropped connection or a server error is retried with
+  backoff (up to 8 times per chunk); the browser asks the server how many bytes it already has and continues from there.
+  After a page reload, select the same folder again to resume unfinished files without sending their data again.
+- Files are stored byte for byte: no conversion of HEIC/HEIF, MOV or anything else. Only the modification time is set to
+  the one of the original file. Each stored file is imported as a normal external library asset and goes through the
+  usual metadata, thumbnail and machine-learning jobs.
+
+### Requirements
+
+- The library must be writable (see "Writable external libraries"), and the server container user must be allowed to
+  create files and folders in its first import path.
+- Only files with a supported photo or video extension are accepted. Hidden files and folders (names starting with
+  `.`), paths matching the library's exclusion patterns, absolute paths, `..`, backslashes, control characters and
+  symbolic links that lead outside the import path are refused (HTTP 400).
+- Reverse proxy: allow request bodies of at least 32 MB and the `PATCH` and `HEAD` methods for `/api/upload-sessions/`.
+
+### How it works
+
+- Partial data is written to `<first import path>/.immich-upload-tmp/<session id>.part` (if the destination folder is
+  on a different mount inside the import path, to a `.immich-upload-tmp` folder on that mount), never to the final path.
+  The folder is hidden, so library scans and the library watcher ignore it.
+- When all bytes are there, the server checks the size and the SHA-1 checksum the browser sent, then hard-links the file
+  to its final name, which never overwrites an existing file (where hard links are not supported, it checks and
+  renames). A checksum mismatch fails the file and deletes the partial data.
+- Sessions expire 24 hours after the last received chunk. The `UploadSessionCleanup` job (nightly with the database
+  cleanup tasks, and once when the microservices worker starts) deletes expired partial files, finished session rows
+  older than 7 days, and `.part` files in `.immich-upload-tmp` of writable libraries that no session knows about.
+- Limits: 32 MB per chunk, 1000 unfinished uploads per user, and at least the file size plus 1 GB of free space in the
+  library's file system when an upload starts.
+- The library scan now skips paths that are already imported, so a watcher event for an uploaded file is a no-op.
+
+### API
+
+All endpoints need the `asset.upload` permission and only work for libraries the caller owns.
+
+| Method and path                                      | Purpose                                                                                                                                    |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/upload-sessions/libraries`                 | Writable libraries of the caller                                                                                                           |
+| `GET /api/upload-sessions/libraries/:id/directories` | Sub-folders of `?path=` inside a writable library                                                                                          |
+| `POST /api/upload-sessions/check`                    | Which of up to 1000 paths already exist                                                                                                    |
+| `POST /api/upload-sessions`                          | Start an upload (library, relative path, size, SHA-1, policy)                                                                              |
+| `GET /api/upload-sessions`                           | List sessions (filter by library, batch or status)                                                                                         |
+| `GET` / `HEAD /api/upload-sessions/:id`              | Session with the number of stored bytes (`Upload-Offset`)                                                                                  |
+| `PATCH /api/upload-sessions/:id`                     | Append a chunk: `Content-Type: application/offset+octet-stream`, `Upload-Offset` header; a wrong offset answers 409 with the stored offset |
+| `POST /api/upload-sessions/:id/complete`             | Verify and store the file; calling it again returns the result                                                                             |
+| `DELETE /api/upload-sessions/:id`                    | Cancel and delete the partial data                                                                                                         |
+
+`PATCH` and `HEAD` are not part of the OpenAPI spec, so the generated SDKs only contain the JSON endpoints.
+
+### Rollback
+
+`immich-admin revert-fork-migrations` also reverts `1795600000000-AddUploadSessionTable`, which drops unfinished upload
+sessions. Delete the `.immich-upload-tmp` folders in the import paths of writable libraries afterwards; files that were
+already uploaded stay where they are and remain normal library files.
+
 ## Outbound network calls
 
 The fork must not add hidden network traffic. Every group lists the outbound calls its features make here.
@@ -210,3 +283,6 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Foundation: none. Writable libraries, safe paths and the rollback command only touch the local file system and the
   database.
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
+
+- Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
+  library's import path and the database.
