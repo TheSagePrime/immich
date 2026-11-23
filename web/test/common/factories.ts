@@ -14,6 +14,7 @@ import {
   type AlbumResponseDto,
   type AssetOcrResponseDto,
   type AssetResponseDto,
+  type LibraryResponseDto,
   type MemoryResponseDto,
   type PersonResponseDto,
   type SharedLinkResponseDto,
@@ -184,6 +185,23 @@ const album = (overrides: Partial<AlbumResponseDto> = {}): AlbumResponseDto => {
     isActivityEnabled: true,
     shared: false,
     order: AssetOrder.Desc,
+    ...overrides,
+  };
+};
+
+const library = (overrides: Partial<LibraryResponseDto> = {}): LibraryResponseDto => {
+  const createdAt = pastDate(365);
+  return {
+    id: crypto.randomUUID(),
+    ownerId: adminUserId,
+    name: 'External Library',
+    assetCount: 0,
+    importPaths: ['/mnt/photos'],
+    exclusionPatterns: [],
+    createdAt,
+    updatedAt: createdAt,
+    refreshedAt: null,
+    writable: false,
     ...overrides,
   };
 };
@@ -509,6 +527,7 @@ const defaultMonths = (): MonthSpec[] => {
 export const factory = {
   activity,
   user,
+  library,
   preferences,
   asset,
   album,

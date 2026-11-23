@@ -1,7 +1,8 @@
 import { LoginResponseDto } from '@immich/sdk';
-import { cpSync } from 'node:fs';
+import { cpSync, mkdirSync } from 'node:fs';
 import { Socket } from 'socket.io-client';
-import { testAssetDir, testAssetDirInternal, utils } from 'src/utils.js';
+import { app, asBearerAuth, testAssetDir, testAssetDirInternal, utils } from 'src/utils.js';
+import request from 'supertest';
 import { utimes } from 'utimes';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -24,6 +25,83 @@ describe('/libraries', () => {
 
   beforeEach(() => {
     utils.resetEvents();
+  });
+
+  describe('writable libraries', () => {
+    beforeAll(() => {
+      mkdirSync(`${testAssetDir}/temp/writable`, { recursive: true });
+    });
+
+    it('should default to not writable', async () => {
+      const { status, body } = await request(app)
+        .post('/libraries')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ ownerId: admin.userId, importPaths: [`${testAssetDirInternal}/temp/writable`] });
+
+      expect(status).toBe(201);
+      expect(body).toEqual(expect.objectContaining({ writable: false }));
+    });
+
+    it('should create a writable library on a read-write import path', async () => {
+      const { status, body } = await request(app)
+        .post('/libraries')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ ownerId: admin.userId, importPaths: [`${testAssetDirInternal}/temp/writable`], writable: true });
+
+      expect(status).toBe(201);
+      expect(body).toEqual(expect.objectContaining({ writable: true }));
+
+      const { body: fetched } = await request(app).get(`/libraries/${body.id}`).set(asBearerAuth(admin.accessToken));
+      expect(fetched).toEqual(expect.objectContaining({ id: body.id, writable: true }));
+    });
+
+    it('should reject a writable library without import paths', async () => {
+      const { status } = await request(app)
+        .post('/libraries')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ ownerId: admin.userId, writable: true });
+
+      expect(status).toBe(400);
+    });
+
+    it('should reject a writable library on a missing import path', async () => {
+      const { status } = await request(app)
+        .post('/libraries')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ ownerId: admin.userId, importPaths: [`${testAssetDirInternal}/temp/does-not-exist`], writable: true });
+
+      expect(status).toBe(400);
+    });
+
+    it('should toggle writable on an existing library', async () => {
+      const library = await utils.createLibrary(admin.accessToken, {
+        ownerId: admin.userId,
+        importPaths: [`${testAssetDirInternal}/temp/writable`],
+      });
+      expect(library.writable).toBe(false);
+
+      const { status, body } = await request(app)
+        .put(`/libraries/${library.id}`)
+        .set(asBearerAuth(admin.accessToken))
+        .send({ writable: true });
+      expect(status).toBe(200);
+      expect(body).toEqual(expect.objectContaining({ writable: true }));
+
+      const { body: disabled } = await request(app)
+        .put(`/libraries/${library.id}`)
+        .set(asBearerAuth(admin.accessToken))
+        .send({ writable: false });
+      expect(disabled).toEqual(expect.objectContaining({ writable: false }));
+    });
+
+    it('should reject a non-boolean writable value', async () => {
+      const { status } = await request(app)
+        .post('/libraries')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ ownerId: admin.userId, writable: 'yes' });
+
+      expect(status).toBe(400);
+    });
   });
 
   describe('POST /libraries/:id/scan', () => {

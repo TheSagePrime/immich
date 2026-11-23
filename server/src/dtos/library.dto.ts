@@ -15,6 +15,7 @@ const CreateLibrarySchema = z
     name: z.string().min(1).optional().describe('Library name'),
     importPaths: stringArrayMax128.optional().describe('Import paths (max 128)'),
     exclusionPatterns: stringArrayMax128.optional().describe('Exclusion patterns (max 128)'),
+    writable: z.boolean().optional().describe('Allow the server to write files into the first import path'),
   })
   .meta({ id: 'CreateLibraryDto' });
 
@@ -23,6 +24,7 @@ const UpdateLibrarySchema = z
     name: z.string().min(1).optional().describe('Library name'),
     importPaths: stringArrayMax128.optional().describe('Import paths (max 128)'),
     exclusionPatterns: stringArrayMax128.optional().describe('Exclusion patterns (max 128)'),
+    writable: z.boolean().optional().describe('Allow the server to write files into the first import path'),
   })
   .meta({ id: 'UpdateLibraryDto' });
 
@@ -71,6 +73,7 @@ const LibraryResponseSchema = z
     createdAt: isoDatetimeToDate.describe('Creation date'),
     updatedAt: isoDatetimeToDate.describe('Last update date'),
     refreshedAt: isoDatetimeToDate.nullable().describe('Last refresh date'),
+    writable: z.boolean().describe('Whether the server may write files into the first import path'),
   })
   .meta({ id: 'LibraryResponseDto' });
 
@@ -103,5 +106,6 @@ export function mapLibrary(entity: Library): LibraryResponseDto {
     assetCount,
     importPaths: entity.importPaths,
     exclusionPatterns: entity.exclusionPatterns,
+    writable: entity.writable,
   };
 }

@@ -31,6 +31,14 @@ export const createApp = (page: Page, data: MockData) => {
             .filter({ hasText: `admin.maintenance_integrity_${report}` })
             .getByTestId('statistic-value'),
       },
+      libraries: {
+        writableBadge: page.getByText('admin.library_writable_enabled', { exact: true }),
+        form: {
+          nameInput: labelled('name'),
+          writableSwitch: labelled('admin.library_writable'),
+          saveButton: button('save'),
+        },
+      },
       users: {
         createUserButton: button('create_user'),
         restoreButton: button('restore'),

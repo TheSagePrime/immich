@@ -16,6 +16,7 @@ import {
   type CreateAlbumDto,
   type DownloadInfoDto,
   type DuplicateResponseDto,
+  type LibraryResponseDto,
   type MapMarkerResponseDto,
   type MemoryResponseDto,
   type MemoryUpdateDto,
@@ -29,6 +30,7 @@ import {
   type TimeBucketsResponseDto,
   type UpdateAlbumDto,
   type UpdateAssetDto,
+  type UpdateLibraryDto,
   type UserAdminCreateDto,
   type UserAdminResponseDto,
   type UserAdminUpdateDto,
@@ -89,6 +91,7 @@ export class MockData {
   private readonly sharedLinks = new Map<string, SharedLinkResponseDto>();
   private readonly tags = new Map<string, TagResponseDto>();
   private readonly activities = new Map<string, ActivityResponseDto>();
+  private readonly libraries = new Map<string, LibraryResponseDto>();
 
   getPreferences() {
     return this.preferences;
@@ -292,6 +295,38 @@ export class MockData {
       updatedAt: new Date().toISOString(),
     };
     this.users.set(id, updated);
+    return updated;
+  }
+
+  addLibraries(libraries: MaybeArray<LibraryResponseDto>) {
+    for (const library of toList(libraries)) {
+      this.libraries.set(library.id, library);
+    }
+    return this;
+  }
+
+  libraryList() {
+    return [...this.libraries.values()];
+  }
+
+  getLibrary(id: string) {
+    return this.libraries.get(id);
+  }
+
+  updateLibrary(id: string, dto: UpdateLibraryDto) {
+    const library = this.libraries.get(id);
+    if (!library) {
+      return;
+    }
+    const updated: LibraryResponseDto = {
+      ...library,
+      name: dto.name ?? library.name,
+      importPaths: dto.importPaths ?? library.importPaths,
+      exclusionPatterns: dto.exclusionPatterns ?? library.exclusionPatterns,
+      writable: dto.writable ?? library.writable,
+      updatedAt: new Date().toISOString(),
+    };
+    this.libraries.set(id, updated);
     return updated;
   }
 

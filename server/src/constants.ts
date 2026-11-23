@@ -43,6 +43,8 @@ export const VECTOR_INDEX_TABLES = {
 
 export const VECTORCHORD_LIST_SLACK_FACTOR = 1.2;
 
+export const OFFICIAL_BASELINE_MIGRATION = '1792568637987-AddAssetOwnerIdUpdateIdIndex';
+
 export const SALT_ROUNDS = 10;
 // Syntactically valid bcrypt hash used in login() preventing timing-based user enumeration.
 export const LOGIN_DUMMY_HASH = '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZabcde';

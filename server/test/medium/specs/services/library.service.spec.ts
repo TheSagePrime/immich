@@ -208,6 +208,52 @@ describe(LibraryService.name, () => {
     });
   });
 
+  describe('writable', () => {
+    it('should default to not writable', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const library = await sut.create({ ownerId: user.id });
+
+      expect(library.writable).toBe(false);
+      await expect(sut.get(library.id)).resolves.toEqual(expect.objectContaining({ writable: false }));
+    });
+
+    it('should persist a writable library whose first import path is writable', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await mkdir(importPath, { recursive: true });
+
+      const library = await sut.create({ ownerId: user.id, importPaths: [importPath], writable: true });
+
+      expect(library.writable).toBe(true);
+      await expect(sut.get(library.id)).resolves.toEqual(expect.objectContaining({ writable: true }));
+    });
+
+    it('should reject a writable library whose first import path does not exist', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      await expect(
+        sut.create({ ownerId: user.id, importPaths: [join(tempDir, 'missing')], writable: true }),
+      ).rejects.toThrow('Invalid import path: Path does not exist (ENOENT)');
+    });
+
+    it('should toggle writable on an existing library', async () => {
+      const { sut, ctx } = setup();
+      await mkdir(importPath, { recursive: true });
+      const library = await ctx.createLibrary({ importPaths: [importPath] });
+
+      await expect(sut.update(library.id, { writable: true })).resolves.toEqual(
+        expect.objectContaining({ writable: true }),
+      );
+      await expect(sut.update(library.id, { writable: false })).resolves.toEqual(
+        expect.objectContaining({ writable: false }),
+      );
+      await expect(sut.get(library.id)).resolves.toEqual(expect.objectContaining({ writable: false }));
+    });
+  });
+
   describe('get', () => {
     it('should get a library by id', async () => {
       const { sut, ctx } = setup();
