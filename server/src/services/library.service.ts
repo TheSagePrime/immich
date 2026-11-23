@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
-import { R_OK } from 'node:constants';
+import { R_OK, W_OK } from 'node:constants';
 import { Stats } from 'node:fs';
 import path, { isAbsolute, parse } from 'node:path';
 import picomatch from 'picomatch';
@@ -234,9 +234,14 @@ export class LibraryService extends BaseService {
   }
 
   async create(dto: CreateLibraryDto): Promise<LibraryResponseDto> {
+    if (dto.writable) {
+      await this.assertWritableImportPath(dto.importPaths ?? []);
+    }
+
     const library = await this.libraryRepository.create({
       ownerId: dto.ownerId,
       name: dto.name ?? 'New External Library',
+      writable: dto.writable ?? false,
       importPaths: dto.importPaths ?? [],
       exclusionPatterns: dto.exclusionPatterns ?? [
         '**/@eaDir/**',
@@ -338,6 +343,23 @@ export class LibraryService extends BaseService {
     return validation;
   }
 
+  private async assertWritableImportPath(importPaths: string[]) {
+    const [firstImportPath] = importPaths;
+    if (!firstImportPath) {
+      throw new BadRequestException('A writable library needs at least one import path');
+    }
+
+    const validation = await this.validateImportPath(firstImportPath);
+    if (!validation.isValid) {
+      throw new BadRequestException(`Invalid import path: ${validation.message}`);
+    }
+
+    const canWrite = await this.storageRepository.checkFileExists(firstImportPath, W_OK);
+    if (!canWrite) {
+      throw new BadRequestException('Lacking write permission for the first import path');
+    }
+  }
+
   async validate(id: string, dto: ValidateLibraryDto): Promise<ValidateLibraryResponseDto> {
     const importPaths = await Promise.all(
       (dto.importPaths || []).map((importPath) => this.validateImportPath(importPath)),
@@ -346,7 +368,7 @@ export class LibraryService extends BaseService {
   }
 
   async update(id: string, dto: UpdateLibraryDto): Promise<LibraryResponseDto> {
-    await this.findOrFail(id);
+    const existing = await this.findOrFail(id);
 
     if (dto.importPaths) {
       const validation = await this.validate(id, { importPaths: dto.importPaths });
@@ -357,6 +379,12 @@ export class LibraryService extends BaseService {
           }
         }
       }
+    }
+
+    const willBeWritable = dto.writable ?? existing.writable;
+    const writableSettingsChanged = dto.writable !== undefined || dto.importPaths !== undefined;
+    if (willBeWritable && writableSettingsChanged) {
+      await this.assertWritableImportPath(dto.importPaths ?? existing.importPaths);
     }
 
     const library = await this.libraryRepository.update(id, dto);

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { R_OK, W_OK } from 'node:constants';
 import { Stats } from 'node:fs';
 import { vitest } from 'vitest';
 import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
@@ -705,6 +706,55 @@ describe(LibraryService.name, () => {
   });
 
   describe('create', () => {
+    describe('writable library', () => {
+      it('should default to not writable', async () => {
+        mocks.library.create.mockResolvedValue(factory.library());
+
+        await sut.create({ ownerId: authStub.admin.user.id });
+
+        expect(mocks.library.create).toHaveBeenCalledWith(expect.objectContaining({ writable: false }));
+        expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
+      });
+
+      it('should require an import path', async () => {
+        await expect(sut.create({ ownerId: authStub.admin.user.id, writable: true })).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+        expect(mocks.library.create).not.toHaveBeenCalled();
+      });
+
+      it('should require the first import path to be writable', async () => {
+        mocks.storage.stat.mockResolvedValue({ isDirectory: () => true } as Stats);
+        mocks.storage.checkFileExists.mockImplementation((_path, mode) => Promise.resolve(mode === R_OK));
+
+        await expect(
+          sut.create({ ownerId: authStub.admin.user.id, writable: true, importPaths: ['/mnt/upload-here'] }),
+        ).rejects.toThrow('Lacking write permission for the first import path');
+        expect(mocks.library.create).not.toHaveBeenCalled();
+      });
+
+      it('should reject an invalid first import path', async () => {
+        await expect(
+          sut.create({ ownerId: authStub.admin.user.id, writable: true, importPaths: ['relative/path'] }),
+        ).rejects.toThrow('Invalid import path');
+        expect(mocks.library.create).not.toHaveBeenCalled();
+      });
+
+      it('should create a writable library', async () => {
+        const library = factory.library({ writable: true, importPaths: ['/mnt/upload-here'] });
+        mocks.library.create.mockResolvedValue(library);
+        mocks.storage.stat.mockResolvedValue({ isDirectory: () => true } as Stats);
+        mocks.storage.checkFileExists.mockResolvedValue(true);
+
+        await expect(
+          sut.create({ ownerId: authStub.admin.user.id, writable: true, importPaths: ['/mnt/upload-here'] }),
+        ).resolves.toEqual(expect.objectContaining({ writable: true }));
+
+        expect(mocks.storage.checkFileExists).toHaveBeenCalledWith('/mnt/upload-here', W_OK);
+        expect(mocks.library.create).toHaveBeenCalledWith(expect.objectContaining({ writable: true }));
+      });
+    });
+
     describe('external library', () => {
       it('should create with default settings', async () => {
         const library = factory.library();
@@ -900,6 +950,72 @@ describe(LibraryService.name, () => {
         expect.objectContaining({ importPaths: [`${cwd}/foo/bar`] }),
       );
       expect(mocks.event.emit).toHaveBeenCalledWith('LibraryUpdate');
+    });
+
+    it('should enable writable when the first import path is writable', async () => {
+      const library = factory.library({ importPaths: ['/mnt/upload-here', '/mnt/other'] });
+      mocks.library.get.mockResolvedValue(library);
+      mocks.library.update.mockResolvedValue({ ...library, writable: true });
+      mocks.storage.stat.mockResolvedValue({ isDirectory: () => true } as Stats);
+      mocks.storage.checkFileExists.mockResolvedValue(true);
+
+      await expect(sut.update(library.id, { writable: true })).resolves.toEqual(
+        expect.objectContaining({ writable: true }),
+      );
+      expect(mocks.storage.checkFileExists).toHaveBeenCalledWith('/mnt/upload-here', W_OK);
+      expect(mocks.library.update).toHaveBeenCalledWith(library.id, { writable: true });
+    });
+
+    it('should not enable writable without import paths', async () => {
+      const library = factory.library({ importPaths: [] });
+      mocks.library.get.mockResolvedValue(library);
+
+      await expect(sut.update(library.id, { writable: true })).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.library.update).not.toHaveBeenCalled();
+    });
+
+    it('should not enable writable when the first import path is read-only', async () => {
+      const library = factory.library({ importPaths: ['/mnt/read-only'] });
+      mocks.library.get.mockResolvedValue(library);
+      mocks.storage.stat.mockResolvedValue({ isDirectory: () => true } as Stats);
+      mocks.storage.checkFileExists.mockImplementation((_path, mode) => Promise.resolve(mode === R_OK));
+
+      await expect(sut.update(library.id, { writable: true })).rejects.toThrow(
+        'Lacking write permission for the first import path',
+      );
+      expect(mocks.library.update).not.toHaveBeenCalled();
+    });
+
+    it('should re-check write access when import paths of a writable library change', async () => {
+      const library = factory.library({ writable: true, importPaths: ['/mnt/upload-here'] });
+      mocks.library.get.mockResolvedValue(library);
+      mocks.storage.stat.mockResolvedValue({ isDirectory: () => true } as Stats);
+      mocks.storage.checkFileExists.mockImplementation((_path, mode) => Promise.resolve(mode === R_OK));
+
+      await expect(sut.update(library.id, { importPaths: ['/mnt/read-only'] })).rejects.toThrow(
+        'Lacking write permission for the first import path',
+      );
+      expect(mocks.library.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow disabling writable without checking the file system', async () => {
+      const library = factory.library({ writable: true, importPaths: ['/mnt/gone'] });
+      mocks.library.get.mockResolvedValue(library);
+      mocks.library.update.mockResolvedValue({ ...library, writable: false });
+
+      await expect(sut.update(library.id, { writable: false })).resolves.toEqual(
+        expect.objectContaining({ writable: false }),
+      );
+      expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
+    });
+
+    it('should not check write access when renaming a writable library', async () => {
+      const library = factory.library({ writable: true, importPaths: ['/mnt/upload-here'] });
+      mocks.library.get.mockResolvedValue(library);
+      mocks.library.update.mockResolvedValue({ ...library, name: 'Renamed' });
+
+      await sut.update(library.id, { name: 'Renamed' });
+      expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
     });
   });
 

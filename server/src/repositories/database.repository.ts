@@ -497,6 +497,28 @@ export class DatabaseRepository {
     return rows[0].pg_try_advisory_lock;
   }
 
+  async revertMigrationsTo(targetMigrationName: string): Promise<string[]> {
+    this.logger.log(`Reverting migrations down to "${targetMigrationName}"`);
+
+    const migrator = this.createMigrator();
+    const { error, results = [] } = await migrator.migrateTo(targetMigrationName);
+
+    for (const result of results) {
+      if (result.status === 'Success') {
+        this.logger.log(`Migration "${result.migrationName}" reverted`);
+      } else if (result.status === 'Error') {
+        this.logger.warn(`Migration "${result.migrationName}" failed to revert`);
+      }
+    }
+
+    if (error) {
+      this.logger.error(`Reverting migrations failed: ${error}`);
+      throw error;
+    }
+
+    return results.filter((result) => result.status === 'Success').map((result) => result.migrationName);
+  }
+
   private async releaseLock(lock: DatabaseLock, connection: Kysely<DB>): Promise<void> {
     await sql`SELECT pg_advisory_unlock(${lock})`.execute(connection);
   }

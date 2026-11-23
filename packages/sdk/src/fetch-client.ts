@@ -1844,6 +1844,8 @@ export type LibraryResponseDto = {
     refreshedAt: string | null;
     /** Last update date */
     updatedAt: string;
+    /** Whether the server may write files into the first import path */
+    writable: boolean;
 };
 export type CreateLibraryDto = {
     /** Exclusion patterns (max 128) */
@@ -1854,6 +1856,8 @@ export type CreateLibraryDto = {
     name?: string;
     /** Owner user ID */
     ownerId: string;
+    /** Allow the server to write files into the first import path */
+    writable?: boolean;
 };
 export type UpdateLibraryDto = {
     /** Exclusion patterns (max 128) */
@@ -1862,6 +1866,8 @@ export type UpdateLibraryDto = {
     importPaths?: string[];
     /** Library name */
     name?: string;
+    /** Allow the server to write files into the first import path */
+    writable?: boolean;
 };
 export type LibraryStatsResponseDto = {
     /** Number of photos */

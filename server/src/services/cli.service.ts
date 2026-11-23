@@ -1,10 +1,10 @@
 import { schemaDiff } from '@immich/sql-tools';
 import { Injectable } from '@nestjs/common';
 import { isAbsolute, join } from 'node:path';
-import { SALT_ROUNDS } from 'src/constants.js';
+import { OFFICIAL_BASELINE_MIGRATION, SALT_ROUNDS } from 'src/constants.js';
 import { MaintenanceAuthDto } from 'src/dtos/maintenance.dto.js';
 import { UserAdminResponseDto, mapUserAdmin } from 'src/dtos/user.dto.js';
-import { MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
+import { DatabaseLock, MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
 import { createMaintenanceLoginUrl, generateMaintenanceSecret } from 'src/utils/maintenance.js';
 import { getExternalDomain } from 'src/utils/misc.js';
@@ -50,6 +50,32 @@ export class CliService extends BaseService {
     const drift = await this.databaseRepository.getSchemaDrift();
 
     return { migrations, drift };
+  }
+
+  async getForkMigrations(): Promise<string[]> {
+    const applied = await this.databaseRepository.getMigrations();
+    const names = applied.map(({ name }) => name);
+    if (!names.includes(OFFICIAL_BASELINE_MIGRATION)) {
+      throw new Error(
+        `The database does not contain the official baseline migration "${OFFICIAL_BASELINE_MIGRATION}", refusing to revert`,
+      );
+    }
+
+    return names
+      .filter((name) => name > OFFICIAL_BASELINE_MIGRATION)
+      .toSorted()
+      .toReversed();
+  }
+
+  async revertForkMigrations(): Promise<string[]> {
+    const pending = await this.getForkMigrations();
+    if (pending.length === 0) {
+      return [];
+    }
+
+    return this.databaseRepository.withLock(DatabaseLock.Migrations, () =>
+      this.databaseRepository.revertMigrationsTo(OFFICIAL_BASELINE_MIGRATION),
+    );
   }
 
   async listUsers(): Promise<UserAdminResponseDto[]> {

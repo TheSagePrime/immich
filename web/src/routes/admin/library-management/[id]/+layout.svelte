@@ -15,7 +15,7 @@
     getLibraryFolderActions,
   } from '#lib/services/library.service.ts';
   import { getBytesWithUnit } from '#lib/utils/byte-units.ts';
-  import { Code, CommandPaletteDefaultProvider, Container, Heading, modalManager } from '@immich/ui';
+  import { Badge, Code, CommandPaletteDefaultProvider, Container, Heading, modalManager } from '@immich/ui';
   import { mdiCameraIris, mdiChartPie, mdiFilterMinusOutline, mdiFolderOutline, mdiPlayCircle } from '@mdi/js';
   import { createQuery } from '@tanstack/svelte-query';
   import { t } from 'svelte-i18n';
@@ -44,7 +44,12 @@
 >
   <Container size="large" center>
     <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
-      <Heading tag="h1" size="large" class="col-span-full my-4">{library.name}</Heading>
+      <div class="col-span-full my-4 flex items-center gap-2">
+        <Heading tag="h1" size="large">{library.name}</Heading>
+        {#if library.writable}
+          <Badge color="primary" size="small">{$t('admin.library_writable_enabled')}</Badge>
+        {/if}
+      </div>
       <div class="col-span-full flex flex-col gap-4 lg:flex-row">
         <ServerStatisticsCard icon={mdiCameraIris} title={$t('photos')} value={stats?.photos} />
         <ServerStatisticsCard icon={mdiPlayCircle} title={$t('videos')} value={stats?.videos} />

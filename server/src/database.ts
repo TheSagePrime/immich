@@ -52,6 +52,7 @@ export type Library = {
   exclusionPatterns: string[];
   deletedAt: Date | null;
   refreshedAt: Date | null;
+  writable: boolean;
   assets?: MapAsset[];
 };
 

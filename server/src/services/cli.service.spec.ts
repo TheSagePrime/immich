@@ -1,6 +1,7 @@
 import { jwtVerify } from 'jose';
 import { describe, it } from 'vitest';
-import { MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
+import { OFFICIAL_BASELINE_MIGRATION } from 'src/constants.js';
+import { DatabaseLock, MaintenanceAction, SystemMetadataKey } from 'src/enum.js';
 import { CliService } from 'src/services/cli.service.js';
 import { UserFactory } from 'test/factories/user.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
@@ -80,6 +81,55 @@ describe(CliService.name, () => {
       await sut.resetAdminPassword(ask);
 
       expect(mocks.session.invalidateAll).toHaveBeenCalledWith({ userId: admin.id });
+    });
+  });
+
+  describe('getForkMigrations', () => {
+    it('should refuse when the official baseline migration was never applied', async () => {
+      mocks.database.getMigrations.mockResolvedValue([{ name: '1744910873969-InitialMigration', timestamp: '' }]);
+
+      await expect(sut.getForkMigrations()).rejects.toThrow(OFFICIAL_BASELINE_MIGRATION);
+    });
+
+    it('should return nothing when only official migrations were applied', async () => {
+      mocks.database.getMigrations.mockResolvedValue([
+        { name: '1744910873969-InitialMigration', timestamp: '' },
+        { name: OFFICIAL_BASELINE_MIGRATION, timestamp: '' },
+      ]);
+
+      await expect(sut.getForkMigrations()).resolves.toEqual([]);
+    });
+
+    it('should return migrations newer than the baseline, newest first', async () => {
+      mocks.database.getMigrations.mockResolvedValue([
+        { name: '1744910873969-InitialMigration', timestamp: '' },
+        { name: OFFICIAL_BASELINE_MIGRATION, timestamp: '' },
+        { name: '1795000000000-ForkA', timestamp: '' },
+        { name: '1796000000000-ForkB', timestamp: '' },
+      ]);
+
+      await expect(sut.getForkMigrations()).resolves.toEqual(['1796000000000-ForkB', '1795000000000-ForkA']);
+    });
+  });
+
+  describe('revertForkMigrations', () => {
+    it('should not touch the database when there is nothing to revert', async () => {
+      mocks.database.getMigrations.mockResolvedValue([{ name: OFFICIAL_BASELINE_MIGRATION, timestamp: '' }]);
+
+      await expect(sut.revertForkMigrations()).resolves.toEqual([]);
+      expect(mocks.database.revertMigrationsTo).not.toHaveBeenCalled();
+    });
+
+    it('should revert down to the baseline under the migration lock', async () => {
+      mocks.database.getMigrations.mockResolvedValue([
+        { name: OFFICIAL_BASELINE_MIGRATION, timestamp: '' },
+        { name: '1795000000000-ForkA', timestamp: '' },
+      ]);
+      mocks.database.revertMigrationsTo.mockResolvedValue(['1795000000000-ForkA']);
+
+      await expect(sut.revertForkMigrations()).resolves.toEqual(['1795000000000-ForkA']);
+      expect(mocks.database.withLock).toHaveBeenCalledWith(DatabaseLock.Migrations, expect.any(Function));
+      expect(mocks.database.revertMigrationsTo).toHaveBeenCalledWith(OFFICIAL_BASELINE_MIGRATION);
     });
   });
 

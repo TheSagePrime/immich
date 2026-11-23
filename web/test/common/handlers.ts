@@ -38,6 +38,15 @@ export const createHandlers = (data: MockData): Handlers => {
       const user = data.updateUser(params.id, body);
       return user ? { json: user } : notFound;
     },
+    getLibrary: ({ params }) => {
+      const library = data.getLibrary(params.id);
+      return library ? { json: library } : notFound;
+    },
+    getLibraryStatistics: () => ({ json: { photos: 0, videos: 0, total: 0, usage: 0 } }),
+    updateLibrary: ({ params, body }) => {
+      const library = data.updateLibrary(params.id, body);
+      return library ? { json: library } : notFound;
+    },
     getUserStatisticsAdmin: () => ({ json: { images: 0, videos: 0, total: 0 } }),
     getUserSessionsAdmin: () => ({ json: [] }),
     getPartners: () => ({ json: [] }),

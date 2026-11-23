@@ -159,6 +159,7 @@ const libraryFactory = (library: Partial<Library> = {}) => ({
   ownerId: newUuid(),
   importPaths: [],
   exclusionPatterns: [],
+  writable: false,
   ...library,
 });
 
