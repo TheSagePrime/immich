@@ -568,6 +568,7 @@ describe(LibraryService.name, () => {
         paths: ['/data/user1/photo.jpg'],
       };
 
+      mocks.asset.filterNewExternalAssetPaths.mockResolvedValue(['/data/user1/photo.jpg']);
       mocks.asset.createAll.mockResolvedValue([asset.id]);
       mocks.library.get.mockResolvedValue(library);
 
@@ -596,6 +597,26 @@ describe(LibraryService.name, () => {
             source: 'upload',
           },
         },
+      ]);
+    });
+
+    it('should skip paths that are already imported', async () => {
+      const library = factory.library();
+
+      const mockLibraryJob: ILibraryFileJob = {
+        libraryId: library.id,
+        paths: ['/data/user1/photo.jpg', '/data/user1/new.jpg'],
+      };
+
+      mocks.asset.filterNewExternalAssetPaths.mockResolvedValue(['/data/user1/new.jpg']);
+      mocks.asset.createAll.mockResolvedValue([]);
+      mocks.library.get.mockResolvedValue(library);
+
+      await expect(sut.handleSyncFiles(mockLibraryJob)).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.asset.filterNewExternalAssetPaths).toHaveBeenCalledWith(library.id, mockLibraryJob.paths);
+      expect(mocks.asset.createAll).toHaveBeenCalledWith([
+        expect.objectContaining({ originalPath: '/data/user1/new.jpg' }),
       ]);
     });
 

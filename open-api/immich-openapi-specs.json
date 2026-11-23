@@ -17099,6 +17099,474 @@
         "x-immich-state": "Stable"
       }
     },
+    "/upload-sessions": {
+      "get": {
+        "description": "List the upload sessions of the current user, for example to resume them after a page reload.",
+        "operationId": "getUploadSessions",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by batch ID",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "libraryId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by library ID",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UploadSessionStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UploadSessionResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List upload sessions",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      },
+      "post": {
+        "description": "Start a resumable upload of one file into a writable library. When the file already exists and the duplicate policy is \"skip\" or \"fail\", the session is finished right away and carries the result.",
+        "operationId": "createUploadSession",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadSessionDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create an upload session",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/upload-sessions/check": {
+      "post": {
+        "description": "Check which of the given paths already exist in a writable library, before uploading.",
+        "operationId": "checkUploadSessions",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadSessionCheckDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionCheckResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Check upload paths",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/upload-sessions/libraries": {
+      "get": {
+        "description": "List the writable external libraries of the current user that files can be uploaded into.",
+        "operationId": "getUploadLibraries",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UploadLibraryResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List upload destinations",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/upload-sessions/libraries/{id}/directories": {
+      "get": {
+        "description": "List the sub-folders of a folder inside a writable library, to choose an upload destination.",
+        "operationId": "getUploadDirectories",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "required": false,
+            "in": "query",
+            "description": "Folder path relative to the first import path of the library",
+            "schema": {
+              "maxLength": 4096,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadDirectoryResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "List upload folders",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/upload-sessions/{id}": {
+      "delete": {
+        "description": "Cancel an unfinished upload and delete the partial data.",
+        "operationId": "cancelUploadSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Cancel an upload session",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      },
+      "get": {
+        "description": "Retrieve an upload session, including the number of bytes the server has stored so far.",
+        "operationId": "getUploadSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve an upload session",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/upload-sessions/{id}/complete": {
+      "post": {
+        "description": "Verify the size and checksum of an uploaded file, move it to its final path following the duplicate policy and import it as a library asset. Calling it again returns the stored result.",
+        "operationId": "completeUploadSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Complete an upload session",
+        "tags": [
+          "Upload sessions"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3.4.2",
+            "state": "Added"
+          },
+          {
+            "version": "v3.4.2",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "asset.upload",
+        "x-immich-state": "Alpha"
+      }
+    },
     "/users": {
       "get": {
         "description": "Retrieve a list of all users on the server.",
@@ -18765,6 +19233,10 @@
     {
       "name": "Users",
       "description": "Endpoints for viewing and updating the current users, including product key information, profile picture data, onboarding progress, and more."
+    },
+    {
+      "name": "Upload sessions",
+      "description": "Resumable, chunked uploads of files into a folder of a writable external library, with a per-batch choice of what to do with files that already exist."
     },
     {
       "name": "Views",
@@ -22345,6 +22817,57 @@
         ],
         "type": "object"
       },
+      "CreateUploadSessionDto": {
+        "properties": {
+          "batchId": {
+            "description": "Client chosen ID grouping the files of one upload",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "checksum": {
+            "description": "Base64 or hex encoded SHA-1 hash of the whole file",
+            "pattern": "^(?:[0-9a-fA-F]{40}|[A-Za-z0-9+/]{27}=)$",
+            "type": "string"
+          },
+          "duplicatePolicy": {
+            "$ref": "#/components/schemas/UploadDuplicatePolicy"
+          },
+          "fileModifiedAt": {
+            "description": "Modification date to set on the stored file",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "libraryId": {
+            "description": "Writable library ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "relativePath": {
+            "description": "File path relative to the first import path of the library",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "size": {
+            "description": "File size in bytes",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "checksum",
+          "duplicatePolicy",
+          "libraryId",
+          "relativePath",
+          "size"
+        ],
+        "type": "object"
+      },
       "CropParameters": {
         "properties": {
           "height": {
@@ -23255,6 +23778,7 @@
           "StorageTemplateMigration",
           "StorageTemplateMigrationSingle",
           "TagCleanup",
+          "UploadSessionCleanup",
           "VersionCheck",
           "OcrQueueAll",
           "Ocr",
@@ -33406,6 +33930,274 @@
           }
         },
         "type": "object"
+      },
+      "UploadDirectoryResponseDto": {
+        "properties": {
+          "directories": {
+            "description": "Names of the sub-folders",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "path": {
+            "description": "Normalized folder path",
+            "type": "string"
+          },
+          "truncated": {
+            "description": "Whether the list was cut off",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "directories",
+          "path",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "UploadDuplicatePolicy": {
+        "description": "What to do when a file already exists at the target path",
+        "enum": [
+          "skip",
+          "keep_both",
+          "fail"
+        ],
+        "type": "string"
+      },
+      "UploadLibraryResponseDto": {
+        "properties": {
+          "id": {
+            "description": "Library ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Library name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "UploadOutcome": {
+        "description": "Upload outcome",
+        "enum": [
+          "created",
+          "renamed",
+          "skipped",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "UploadSessionCheckDto": {
+        "properties": {
+          "items": {
+            "description": "Paths to check",
+            "items": {
+              "$ref": "#/components/schemas/UploadSessionCheckItem"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "libraryId": {
+            "description": "Writable library ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "libraryId"
+        ],
+        "type": "object"
+      },
+      "UploadSessionCheckItem": {
+        "properties": {
+          "id": {
+            "description": "Client chosen item ID echoed in the result",
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "relativePath": {
+            "description": "File path relative to the first import path of the library",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "relativePath"
+        ],
+        "type": "object"
+      },
+      "UploadSessionCheckResponseDto": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/UploadSessionCheckResultDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "type": "object"
+      },
+      "UploadSessionCheckResultDto": {
+        "properties": {
+          "assetId": {
+            "description": "ID of the asset at the path",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "error": {
+            "description": "Why the path cannot be used",
+            "type": "string"
+          },
+          "exists": {
+            "description": "Whether a file or folder already exists at the path",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Item ID from the request",
+            "type": "string"
+          },
+          "suggestedRelativePath": {
+            "description": "Next free numbered path for \"keep both\"",
+            "type": "string"
+          }
+        },
+        "required": [
+          "exists",
+          "id"
+        ],
+        "type": "object"
+      },
+      "UploadSessionResponseDto": {
+        "properties": {
+          "batchId": {
+            "description": "Batch ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "chunkSize": {
+            "description": "Suggested chunk size in bytes",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "duplicatePolicy": {
+            "$ref": "#/components/schemas/UploadDuplicatePolicy"
+          },
+          "expiresAt": {
+            "description": "When the session expires if no data is received",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "id": {
+            "description": "Upload session ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "libraryId": {
+            "description": "Library ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "maxChunkSize": {
+            "description": "Largest accepted chunk in bytes",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Number of bytes stored so far",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "relativePath": {
+            "description": "Requested path relative to the first import path of the library",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/UploadSessionResultDto"
+          },
+          "size": {
+            "description": "File size in bytes",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UploadSessionStatus"
+          }
+        },
+        "required": [
+          "chunkSize",
+          "duplicatePolicy",
+          "expiresAt",
+          "id",
+          "libraryId",
+          "maxChunkSize",
+          "offset",
+          "relativePath",
+          "size",
+          "status"
+        ],
+        "type": "object"
+      },
+      "UploadSessionResultDto": {
+        "properties": {
+          "assetId": {
+            "description": "ID of the imported or already existing asset",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "message": {
+            "description": "Reason for a failed or skipped upload",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/UploadOutcome"
+          },
+          "relativePath": {
+            "description": "Final path relative to the first import path of the library",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "relativePath"
+        ],
+        "type": "object"
+      },
+      "UploadSessionStatus": {
+        "description": "Upload session status",
+        "enum": [
+          "active",
+          "completing",
+          "completed",
+          "cancelled",
+          "failed"
+        ],
+        "type": "string"
       },
       "UsageByUserDto": {
         "properties": {

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
 import { R_OK, W_OK } from 'node:constants';
 import { Stats } from 'node:fs';
-import path, { isAbsolute, parse } from 'node:path';
+import path, { isAbsolute } from 'node:path';
 import picomatch from 'picomatch';
 import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
@@ -17,22 +17,13 @@ import {
   ValidateLibraryResponseDto,
   mapLibrary,
 } from 'src/dtos/library.dto.js';
-import {
-  AssetStatus,
-  AssetType,
-  ChecksumAlgorithm,
-  CronJob,
-  DatabaseLock,
-  ImmichWorker,
-  JobName,
-  JobStatus,
-  QueueName,
-} from 'src/enum.js';
+import { AssetStatus, CronJob, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { AssetSyncResult } from 'src/repositories/library.repository.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobOf } from 'src/types.js';
+import { toExternalAssetInsert } from 'src/utils/library.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, createLibraryMatcher, findOrFail, handlePromiseError } from 'src/utils/misc.js';
 
@@ -270,9 +261,11 @@ export class LibraryService extends BaseService {
       return JobStatus.Failed;
     }
 
+    const newPaths = await this.assetRepository.filterNewExternalAssetPaths(library.id, job.paths);
+
     const assetImports: Insertable<AssetTable>[] = [];
     await Promise.all(
-      job.paths.map(async (path) => {
+      newPaths.map(async (path) => {
         try {
           const asset = await this.processEntity(path, library.ownerId, job.libraryId);
           assetImports.push(asset);
@@ -433,24 +426,14 @@ export class LibraryService extends BaseService {
   }
 
   private async processEntity(filePath: string, ownerId: string, libraryId: string) {
-    const assetPath = path.normalize(filePath);
-    const stat = await this.storageRepository.stat(assetPath);
-
-    return {
+    const stat = await this.storageRepository.stat(path.normalize(filePath));
+    return toExternalAssetInsert({
       ownerId,
       libraryId,
-      checksum: this.cryptoRepository.hashSha1(`path:${assetPath}`),
-      checksumAlgorithm: ChecksumAlgorithm.sha1Path,
-      originalPath: assetPath,
-
-      fileCreatedAt: stat.mtime,
-      fileModifiedAt: stat.mtime,
-      localDateTime: stat.mtime,
-      type: mimeTypes.isVideo(assetPath) ? AssetType.Video : AssetType.Image,
-      originalFileName: parse(assetPath).base,
-      isExternal: true,
-      livePhotoVideoId: null,
-    };
+      path: filePath,
+      stat,
+      hashSha1: (value) => this.cryptoRepository.hashSha1(value),
+    });
   }
 
   async queuePostSyncJobs(assetIds: string[]) {

@@ -83,6 +83,22 @@ export class StorageRepository {
     return createWriteStream(filepath, { flags: 'w', flush: true });
   }
 
+  createAppendStream(filepath: string): Writable {
+    return createWriteStream(filepath, { flags: 'a', flush: true });
+  }
+
+  link(source: string, target: string) {
+    return fs.link(source, target);
+  }
+
+  async mkdir(filepath: string, mode?: number) {
+    await fs.mkdir(filepath, { mode });
+  }
+
+  lstat(filepath: string) {
+    return fs.lstat(filepath);
+  }
+
   createOrOverwriteFile(filepath: string, buffer: Buffer) {
     return fs.writeFile(filepath, buffer, { flag: 'w' });
   }

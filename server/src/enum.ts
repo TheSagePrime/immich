@@ -958,6 +958,8 @@ export enum JobName {
 
   TagCleanup = 'TagCleanup',
 
+  UploadSessionCleanup = 'UploadSessionCleanup',
+
   VersionCheck = 'VersionCheck',
 
   // OCR
@@ -1034,6 +1036,7 @@ export enum DatabaseLock {
   HlsSessionCleanup = 850,
   FacialRecognition = 900,
   DuplicateDetection = 1000,
+  UploadSessionCleanup = 1100,
 }
 
 export enum MaintenanceAction {
@@ -1048,6 +1051,39 @@ export const MaintenanceActionSchema = z
   .enum(MaintenanceAction)
   .describe('Maintenance action')
   .meta({ id: 'MaintenanceAction' });
+
+export enum UploadDuplicatePolicy {
+  Skip = 'skip',
+  KeepBoth = 'keep_both',
+  Fail = 'fail',
+}
+
+export const UploadDuplicatePolicySchema = z
+  .enum(UploadDuplicatePolicy)
+  .describe('What to do when a file already exists at the target path')
+  .meta({ id: 'UploadDuplicatePolicy' });
+
+export enum UploadSessionStatus {
+  Active = 'active',
+  Completing = 'completing',
+  Completed = 'completed',
+  Cancelled = 'cancelled',
+  Failed = 'failed',
+}
+
+export const UploadSessionStatusSchema = z
+  .enum(UploadSessionStatus)
+  .describe('Upload session status')
+  .meta({ id: 'UploadSessionStatus' });
+
+export enum UploadOutcome {
+  Created = 'created',
+  Renamed = 'renamed',
+  Skipped = 'skipped',
+  Failed = 'failed',
+}
+
+export const UploadOutcomeSchema = z.enum(UploadOutcome).describe('Upload outcome').meta({ id: 'UploadOutcome' });
 
 export enum ExitCode {
   AppRestart = 7,
@@ -1301,6 +1337,7 @@ export enum ApiTag {
   Trash = 'Trash',
   UsersAdmin = 'Users (admin)',
   Users = 'Users',
+  UploadSessions = 'Upload sessions',
   Views = 'Views',
   Workflows = 'Workflows',
 }

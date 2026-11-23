@@ -407,6 +407,7 @@ export type JobItem =
   | { name: JobName.SessionCleanup; data?: IBaseJob }
   | { name: JobName.AuthChallengeCleanup; data?: IBaseJob }
   | { name: JobName.HlsSessionCleanup; data?: IBaseJob }
+  | { name: JobName.UploadSessionCleanup; data?: IBaseJob }
 
   // Tags
   | { name: JobName.TagCleanup; data?: IBaseJob }

@@ -3278,6 +3278,94 @@ export type TrashResponseDto = {
     /** Number of items in trash */
     count: number;
 };
+export type UploadSessionResultDto = {
+    /** ID of the imported or already existing asset */
+    assetId?: string;
+    /** Reason for a failed or skipped upload */
+    message?: string;
+    outcome: UploadOutcome;
+    /** Final path relative to the first import path of the library */
+    relativePath: string;
+};
+export type UploadSessionResponseDto = {
+    /** Batch ID */
+    batchId?: string;
+    /** Suggested chunk size in bytes */
+    chunkSize: number;
+    duplicatePolicy: UploadDuplicatePolicy;
+    /** When the session expires if no data is received */
+    expiresAt: string;
+    /** Upload session ID */
+    id: string;
+    /** Library ID */
+    libraryId: string;
+    /** Largest accepted chunk in bytes */
+    maxChunkSize: number;
+    /** Number of bytes stored so far */
+    offset: number;
+    /** Requested path relative to the first import path of the library */
+    relativePath: string;
+    result?: UploadSessionResultDto;
+    /** File size in bytes */
+    size: number;
+    status: UploadSessionStatus;
+};
+export type CreateUploadSessionDto = {
+    /** Client chosen ID grouping the files of one upload */
+    batchId?: string;
+    /** Base64 or hex encoded SHA-1 hash of the whole file */
+    checksum: string;
+    duplicatePolicy: UploadDuplicatePolicy;
+    /** Modification date to set on the stored file */
+    fileModifiedAt?: string;
+    /** Writable library ID */
+    libraryId: string;
+    /** File path relative to the first import path of the library */
+    relativePath: string;
+    /** File size in bytes */
+    size: number;
+};
+export type UploadSessionCheckItem = {
+    /** Client chosen item ID echoed in the result */
+    id: string;
+    /** File path relative to the first import path of the library */
+    relativePath: string;
+};
+export type UploadSessionCheckDto = {
+    /** Paths to check */
+    items: UploadSessionCheckItem[];
+    /** Writable library ID */
+    libraryId: string;
+};
+export type UploadSessionCheckResultDto = {
+    /** ID of the asset at the path */
+    assetId?: string;
+    /** Why the path cannot be used */
+    error?: string;
+    /** Whether a file or folder already exists at the path */
+    exists: boolean;
+    /** Item ID from the request */
+    id: string;
+    /** Next free numbered path for "keep both" */
+    suggestedRelativePath?: string;
+};
+export type UploadSessionCheckResponseDto = {
+    results: UploadSessionCheckResultDto[];
+};
+export type UploadLibraryResponseDto = {
+    /** Library ID */
+    id: string;
+    /** Library name */
+    name: string;
+};
+export type UploadDirectoryResponseDto = {
+    /** Names of the sub-folders */
+    directories: string[];
+    /** Normalized folder path */
+    path: string;
+    /** Whether the list was cut off */
+    truncated: boolean;
+};
 export type UserUpdateMeDto = {
     avatarColor?: (UserAvatarColor) | null;
     /** User email */
@@ -7805,6 +7893,120 @@ export function restoreAssets({ bulkIdsDto }: {
     })));
 }
 /**
+ * List upload sessions
+ */
+export function getUploadSessions({ batchId, libraryId, status }: {
+    batchId?: string;
+    libraryId?: string;
+    status?: UploadSessionStatus;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UploadSessionResponseDto[];
+    }>(`/upload-sessions${QS.query(QS.explode({
+        batchId,
+        libraryId,
+        status
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Create an upload session
+ */
+export function createUploadSession({ createUploadSessionDto }: {
+    createUploadSessionDto: CreateUploadSessionDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: UploadSessionResponseDto;
+    }>("/upload-sessions", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: createUploadSessionDto
+    })));
+}
+/**
+ * Check upload paths
+ */
+export function checkUploadSessions({ uploadSessionCheckDto }: {
+    uploadSessionCheckDto: UploadSessionCheckDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UploadSessionCheckResponseDto;
+    }>("/upload-sessions/check", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: uploadSessionCheckDto
+    })));
+}
+/**
+ * List upload destinations
+ */
+export function getUploadLibraries(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UploadLibraryResponseDto[];
+    }>("/upload-sessions/libraries", {
+        ...opts
+    }));
+}
+/**
+ * List upload folders
+ */
+export function getUploadDirectories({ id, path }: {
+    id: string;
+    path?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UploadDirectoryResponseDto;
+    }>(`/upload-sessions/libraries/${encodeURIComponent(id)}/directories${QS.query(QS.explode({
+        path
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Cancel an upload session
+ */
+export function cancelUploadSession({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/upload-sessions/${encodeURIComponent(id)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Retrieve an upload session
+ */
+export function getUploadSession({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UploadSessionResponseDto;
+    }>(`/upload-sessions/${encodeURIComponent(id)}`, {
+        ...opts
+    }));
+}
+/**
+ * Complete an upload session
+ */
+export function completeUploadSession({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UploadSessionResponseDto;
+    }>(`/upload-sessions/${encodeURIComponent(id)}/complete`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Get all users
  */
 export function searchUsers(opts?: Oazapfts.RequestOpts) {
@@ -8687,6 +8889,7 @@ export enum JobName {
     StorageTemplateMigration = "StorageTemplateMigration",
     StorageTemplateMigrationSingle = "StorageTemplateMigrationSingle",
     TagCleanup = "TagCleanup",
+    UploadSessionCleanup = "UploadSessionCleanup",
     VersionCheck = "VersionCheck",
     OcrQueueAll = "OcrQueueAll",
     Ocr = "Ocr",
@@ -8826,6 +9029,24 @@ export enum SyncRequestType {
 export enum AssetOrderBy {
     TakenAt = "takenAt",
     CreatedAt = "createdAt"
+}
+export enum UploadSessionStatus {
+    Active = "active",
+    Completing = "completing",
+    Completed = "completed",
+    Cancelled = "cancelled",
+    Failed = "failed"
+}
+export enum UploadDuplicatePolicy {
+    Skip = "skip",
+    KeepBoth = "keep_both",
+    Fail = "fail"
+}
+export enum UploadOutcome {
+    Created = "created",
+    Renamed = "renamed",
+    Skipped = "skipped",
+    Failed = "failed"
 }
 export enum WorkflowResult {
     Completed = "completed",

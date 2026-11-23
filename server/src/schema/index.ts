@@ -89,6 +89,7 @@ import { TagTable } from 'src/schema/tables/tag.table.js';
 import { UserAuditTable } from 'src/schema/tables/user-audit.table.js';
 import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.table.js';
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
+import { UploadSessionTable } from 'src/schema/tables/upload-session.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { VersionHistoryTable } from 'src/schema/tables/version-history.table.js';
 import {
@@ -163,6 +164,7 @@ export class ImmichDatabase {
     UserMetadataTable,
     UserMetadataAuditTable,
     UserTable,
+    UploadSessionTable,
     VersionHistoryTable,
     VideoStreamSessionTable,
     VideoStreamVariantTable,
@@ -300,6 +302,8 @@ export interface DB {
   user_audit: UserAuditTable;
   user_metadata: UserMetadataTable;
   user_metadata_audit: UserMetadataAuditTable;
+
+  upload_session: UploadSessionTable;
 
   version_history: VersionHistoryTable;
 
