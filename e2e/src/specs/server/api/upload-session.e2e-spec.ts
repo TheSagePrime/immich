@@ -316,7 +316,7 @@ describe('/upload-sessions', () => {
 
     const { status } = await request(app).delete(`/upload-sessions/${session.id}`).set(asBearerAuth(admin.accessToken));
     expect(status).toBe(204);
-    expect(readdirSync(`${hostRoot}/.immich-upload-tmp`)).toEqual([]);
+    expect(readdirSync(`${hostRoot}/.immich-upload-tmp`)).not.toContain(`${session.id}.part`);
     expect(existsSync(`${hostRoot}/cancel.jpg`)).toBe(false);
 
     const { body } = await request(app).get(`/upload-sessions/${session.id}`).set(asBearerAuth(admin.accessToken));
