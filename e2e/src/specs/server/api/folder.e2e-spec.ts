@@ -1,5 +1,5 @@
 import { LoginResponseDto } from '@immich/sdk';
-import { existsSync, mkdirSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { app, asBearerAuth, testAssetDir, testAssetDirInternal, utils } from 'src/utils.js';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -173,7 +173,7 @@ describe('/folders', () => {
 
       expect(status).toBe(200);
       expect(body).toEqual({ path: `${root}/trip/first day` });
-      expect(existsSync(`${hostRoot}/trip/first day/a.png`)).toBe(true);
+      expect(readdirSync(`${hostRoot}/trip/first day`)).toHaveLength(2);
       await expect(getAssetIds(`${root}/trip/first day`)).resolves.toEqual(before);
       await expect(getAssetIds(`${root}/trip/day1`)).resolves.toEqual([]);
     });
@@ -256,7 +256,7 @@ describe('/folders', () => {
 
       expect(status).toBe(200);
       expect(body).toEqual({ trashed: 2, deleted: 0, removedFolders: 0, failed: [] });
-      expect(existsSync(`${hostRoot}/trip/first day/a.png`)).toBe(true);
+      expect(readdirSync(`${hostRoot}/trip/first day`)).toHaveLength(2);
       await expect(getAssetIds(`${root}/trip/first day`)).resolves.toEqual([]);
 
       const { status: restoreStatus } = await request(app)
