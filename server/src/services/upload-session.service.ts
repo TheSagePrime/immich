@@ -124,8 +124,11 @@ export class UploadSessionService extends BaseService {
     try {
       entries = await this.storageRepository.readdirWithTypes(directory);
     } catch (error) {
-      if (isErrorCode(error, 'ENOENT', 'ENOTDIR')) {
-        throw new NotFoundException('Folder not found');
+      if (isErrorCode(error, 'ENOENT')) {
+        return { path: relativeDirectory, directories: [], truncated: false };
+      }
+      if (isErrorCode(error, 'ENOTDIR')) {
+        throw new BadRequestException('Path is not a folder');
       }
       throw error;
     }
