@@ -1,16 +1,28 @@
 <script lang="ts">
   import { shouldIgnoreEvent } from '#lib/actions/shortcut.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import FolderUploadModal from '#lib/modals/FolderUploadModal.svelte';
+  import { queryClient } from '#lib/queries/client.ts';
+  import { getUploadLibrariesQuery } from '#lib/queries/upload-session.query.ts';
   import { dragAndDropFilesStore } from '#lib/stores/drag-and-drop-files.store.ts';
+  import { getEntryRelativePath, type FolderUploadEntry } from '#lib/utils/chunked-upload.ts';
   import { fileUploadHandler } from '#lib/utils/file-uploader.ts';
   import { isAlbumsRoute, isLockedFolderRoute } from '#lib/utils/navigation.ts';
-  import { Logo } from '@immich/ui';
+  import { Icon, Logo, modalManager } from '@immich/ui';
+  import { mdiFolderUploadOutline } from '@mdi/js';
+  import { createQuery } from '@tanstack/svelte-query';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import { page } from '$app/state';
 
   let albumId = $derived(isAlbumsRoute(page.route?.id) ? page.params.albumId : undefined);
   let isInLockedFolder = $derived(isLockedFolderRoute(page.route.id));
+
+  const uploadLibrariesQuery = createQuery(() => ({
+    ...getUploadLibrariesQuery(),
+    enabled: authManager.authenticated && !authManager.isSharedLink,
+  }));
+  const canUploadFolders = $derived((uploadLibrariesQuery.data?.length ?? 0) > 0);
 
   let dragStartTarget: EventTarget | null = $state(null);
   let isInternalDrag = false;
@@ -64,14 +76,34 @@
       }
     }
 
-    const directoryFiles = await getAllFilesFromTransferEntries(entries);
-    return handleFiles([...files, ...directoryFiles]);
+    const directoryEntries = await getAllFilesFromTransferEntries(entries);
+    const hasDirectory = entries.some((entry) => entry.isDirectory);
+    if (hasDirectory && (await hasWritableLibrary())) {
+      const folderEntries = [...files.map((file) => ({ file, relativePath: file.name })), ...directoryEntries];
+      await modalManager.show(FolderUploadModal, { entries: folderEntries });
+      return;
+    }
+
+    return handleFiles([...files, ...directoryEntries.map(({ file }) => file)]);
+  };
+
+  const hasWritableLibrary = async () => {
+    if (authManager.isSharedLink) {
+      return false;
+    }
+
+    try {
+      const libraries = await queryClient.fetchQuery(getUploadLibrariesQuery());
+      return libraries.length > 0;
+    } catch {
+      return false;
+    }
   };
 
   const browserSupportsDirectoryUpload = () => typeof DataTransferItem.prototype.webkitGetAsEntry === 'function';
 
-  const getAllFilesFromTransferEntries = async (transferEntries: FileSystemEntry[]): Promise<File[]> => {
-    const allFiles: File[] = [];
+  const getAllFilesFromTransferEntries = async (transferEntries: FileSystemEntry[]): Promise<FolderUploadEntry[]> => {
+    const allFiles: FolderUploadEntry[] = [];
     let entriesToCheckForSubDirectories = [...transferEntries];
     while (entriesToCheckForSubDirectories.length > 0) {
       const currentEntry = entriesToCheckForSubDirectories.pop();
@@ -81,7 +113,8 @@
           await getContentsFromFileSystemDirectoryEntry(currentEntry),
         );
       } else if (isFileSystemFileEntry(currentEntry)) {
-        allFiles.push(await getFileFromFileSystemEntry(currentEntry));
+        const file = await getFileFromFileSystemEntry(currentEntry);
+        allFiles.push({ file, relativePath: getEntryRelativePath(file, currentEntry.fullPath) });
       }
     }
 
@@ -179,11 +212,23 @@
 {#if dragStartTarget}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="fixed inset-0 flex size-full flex-col items-center justify-center bg-gray-100/90 text-immich-dark-gray dark:bg-immich-dark-bg/90 dark:text-immich-gray"
-    transition:fade={{ duration: 250 }}
+    class="fixed inset-0 z-9999 flex size-full flex-col items-center justify-center bg-gray-100/95 p-6 text-immich-dark-gray dark:bg-immich-dark-bg/95 dark:text-immich-gray"
+    transition:fade={{ duration: 150 }}
     ondragover={onDragOver}
+    data-testid="drop-overlay"
   >
-    <Logo variant="icon" size="giant" class="m-16 animate-bounce" />
-    <div class="text-2xl">{$t('drop_files_to_upload')}</div>
+    <div
+      class="pointer-events-none flex size-full flex-col items-center justify-center gap-6 rounded-3xl border-4 border-dashed border-primary bg-primary/5"
+    >
+      <Logo variant="icon" size="giant" class="animate-bounce" />
+      <div class="flex items-center gap-3 text-center text-3xl font-medium text-primary">
+        {#if canUploadFolders}
+          <Icon icon={mdiFolderUploadOutline} size="40" />
+          {$t('drop_files_or_folders_to_upload')}
+        {:else}
+          {$t('drop_files_to_upload')}
+        {/if}
+      </div>
+    </div>
   </div>
 {/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getPagesProvider, getSettingsProvider } from '#lib/commands.ts';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import FolderUploadPanel from '#lib/components/folder-upload/FolderUploadPanel.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import ServerRestartingModal from '#lib/modals/ServerRestartingModal.svelte';
@@ -232,6 +233,9 @@
 
     <DownloadPanel />
     <UploadPanel />
+    {#if authManager.authenticated}
+      <FolderUploadPanel />
+    {/if}
     <ScreencastOverlay />
 
     <CommandPaletteProvider

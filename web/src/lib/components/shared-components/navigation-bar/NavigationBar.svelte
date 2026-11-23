@@ -4,6 +4,7 @@
 
 <script lang="ts">
   import { clickOutside } from '#lib/actions/click-outside.ts';
+  import FolderUploadButton from '#lib/components/folder-upload/FolderUploadButton.svelte';
   import NotificationPanel from '#lib/components/shared-components/navigation-bar/NotificationPanel.svelte';
   import SearchBar from '#lib/components/shared-components/search-bar/SearchBar.svelte';
   import SkipLink from '#lib/elements/SkipLink.svelte';
@@ -113,6 +114,7 @@
             icon={mdiTrayArrowUp}
             class="lg:hidden"
           />
+          <FolderUploadButton />
         {/if}
 
         <ThemeButton />

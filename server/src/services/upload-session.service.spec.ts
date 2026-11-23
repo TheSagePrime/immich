@@ -643,6 +643,17 @@ describe(UploadSessionService.name, () => {
       });
     });
 
+    it('should return no folders for a folder that does not exist yet', async () => {
+      mocks.library.get.mockResolvedValue(makeLibrary());
+      mocks.storage.readdirWithTypes.mockRejectedValue(errorWithCode('ENOENT'));
+
+      await expect(sut.getDirectories(auth, newUuid(), { path: 'trip/new' })).resolves.toEqual({
+        path: 'trip/new',
+        directories: [],
+        truncated: false,
+      });
+    });
+
     it('should refuse a path outside the library', async () => {
       mocks.library.get.mockResolvedValue(makeLibrary());
       await expect(sut.getDirectories(auth, newUuid(), { path: '../' })).rejects.toBeInstanceOf(BadRequestException);
