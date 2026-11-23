@@ -38,6 +38,7 @@ export const createHandlers = (data: MockData): Handlers => {
       const user = data.updateUser(params.id, body);
       return user ? { json: user } : notFound;
     },
+    getAllLibraries: () => ({ json: data.libraryList() }),
     getLibrary: ({ params }) => {
       const library = data.getLibrary(params.id);
       return library ? { json: library } : notFound;

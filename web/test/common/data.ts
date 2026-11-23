@@ -305,6 +305,10 @@ export class MockData {
     return this;
   }
 
+  libraryList() {
+    return [...this.libraries.values()];
+  }
+
   getLibrary(id: string) {
     return this.libraries.get(id);
   }
