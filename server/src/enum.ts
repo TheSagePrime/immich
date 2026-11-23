@@ -84,6 +84,13 @@ export enum AssetOrder {
 
 export const AssetOrderSchema = z.enum(AssetOrder).describe('Asset sort order').meta({ id: 'AssetOrder' });
 
+export enum StartPage {
+  Timeline = 'timeline',
+  Folders = 'folders',
+}
+
+export const StartPageSchema = z.enum(StartPage).describe('Page shown after login').meta({ id: 'StartPage' });
+
 export enum AssetOrderBy {
   TakenAt = 'takenAt',
   CreatedAt = 'createdAt',
@@ -1034,6 +1041,7 @@ export enum DatabaseLock {
   HlsSessionCleanup = 850,
   FacialRecognition = 900,
   DuplicateDetection = 1000,
+  FolderManagement = 1338,
 }
 
 export enum MaintenanceAction {
@@ -1274,6 +1282,7 @@ export enum ApiTag {
   Download = 'Download',
   Duplicates = 'Duplicates',
   Faces = 'Faces',
+  Folders = 'Folders',
   Integrity = 'Integrity (admin)',
   Jobs = 'Jobs',
   Libraries = 'Libraries',

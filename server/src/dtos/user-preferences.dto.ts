@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import { AssetOrderSchema, PersonUpdateStrategySchema, UserAvatarColorSchema } from 'src/enum.js';
+import { AssetOrderSchema, PersonUpdateStrategySchema, StartPageSchema, UserAvatarColorSchema } from 'src/enum.js';
 import type { UserPreferences } from 'src/types.js';
 
 const AlbumsUpdateSchema = z
@@ -41,6 +41,14 @@ const FoldersUpdateSchema = z
   })
   .optional()
   .meta({ id: 'FoldersUpdate' });
+
+const NavigationUpdateSchema = z
+  .object({
+    startPage: StartPageSchema.optional(),
+  })
+  .optional()
+  .describe('Navigation preferences')
+  .meta({ id: 'NavigationUpdate' });
 
 const PeopleUpdateSchema = z
   .object({
@@ -116,6 +124,7 @@ const UserPreferencesUpdateSchema = z
     emailNotifications: EmailNotificationsUpdateSchema,
     folders: FoldersUpdateSchema,
     memories: MemoriesUpdateSchema,
+    navigation: NavigationUpdateSchema,
     people: PeopleUpdateSchema,
     purchase: PurchaseUpdateSchema,
     ratings: RatingsUpdateSchema,
@@ -137,6 +146,12 @@ const FoldersResponseSchema = z
     sidebarWeb: z.boolean().describe('Whether folders appear in web sidebar'),
   })
   .meta({ id: 'FoldersResponse' });
+
+const NavigationResponseSchema = z
+  .object({
+    startPage: StartPageSchema,
+  })
+  .meta({ id: 'NavigationResponse' });
 
 const MemoriesResponseSchema = z
   .object({
@@ -214,6 +229,7 @@ const UserPreferencesResponseSchema = z
     albums: AlbumsResponseSchema,
     folders: FoldersResponseSchema,
     memories: MemoriesResponseSchema,
+    navigation: NavigationResponseSchema.optional(),
     people: PeopleResponseSchema,
     ratings: RatingsResponseSchema,
     sharedLinks: SharedLinksResponseSchema,

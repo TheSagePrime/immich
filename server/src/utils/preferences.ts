@@ -1,6 +1,6 @@
 import { get, isEqual, set } from 'lodash-es';
 import { UserPreferencesUpdateDto } from 'src/dtos/user-preferences.dto.js';
-import { AssetOrder, PersonUpdateStrategy, UserMetadataKey } from 'src/enum.js';
+import { AssetOrder, PersonUpdateStrategy, StartPage, UserMetadataKey } from 'src/enum.js';
 import type { DeepPartial, UserMetadataItem, UserPreferences } from 'src/types.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getKeysDeep } from 'src/utils/misc.js';
@@ -11,8 +11,11 @@ const getDefaultPreferences = (): UserPreferences => {
       defaultAssetOrder: AssetOrder.Desc,
     },
     folders: {
-      enabled: false,
-      sidebarWeb: false,
+      enabled: true,
+      sidebarWeb: true,
+    },
+    navigation: {
+      startPage: StartPage.Timeline,
     },
     memories: {
       enabled: true,

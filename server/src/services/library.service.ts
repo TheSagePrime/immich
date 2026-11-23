@@ -270,9 +270,14 @@ export class LibraryService extends BaseService {
       return JobStatus.Failed;
     }
 
+    const paths = await this.assetRepository.filterNewExternalAssetPaths(
+      job.libraryId,
+      job.paths.map((filePath) => path.normalize(filePath)),
+    );
+
     const assetImports: Insertable<AssetTable>[] = [];
     await Promise.all(
-      job.paths.map(async (path) => {
+      paths.map(async (path) => {
         try {
           const asset = await this.processEntity(path, library.ownerId, job.libraryId);
           assetImports.push(asset);
@@ -709,12 +714,14 @@ export class LibraryService extends BaseService {
   async handleAssetRemoval(job: JobOf<JobName.LibraryRemoveAsset>): Promise<JobStatus> {
     // This is only for handling file unlink events via the file watcher
     this.logger.verbose(`Deleting asset(s) ${job.paths} from library ${job.libraryId}`);
-    for (const assetPath of job.paths) {
-      const asset = await this.assetRepository.getByLibraryIdAndOriginalPath(job.libraryId, assetPath);
-      if (asset) {
-        await this.assetRepository.remove(asset);
+    await this.databaseRepository.withLock(DatabaseLock.FolderManagement, async () => {
+      for (const assetPath of job.paths) {
+        const asset = await this.assetRepository.getByLibraryIdAndOriginalPath(job.libraryId, assetPath);
+        if (asset) {
+          await this.assetRepository.remove(asset);
+        }
       }
-    }
+    });
 
     return JobStatus.Success;
   }

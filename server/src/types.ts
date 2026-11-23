@@ -27,6 +27,7 @@ import {
   MemoryType,
   PersonUpdateStrategy,
   QueueName,
+  StartPage,
   StorageFolder,
   SyncEntityType,
   SystemMetadataKey,
@@ -565,6 +566,9 @@ export type UserPreferences = {
   folders: {
     enabled: boolean;
     sidebarWeb: boolean;
+  };
+  navigation: {
+    startPage: StartPage;
   };
   memories: {
     enabled: boolean;
