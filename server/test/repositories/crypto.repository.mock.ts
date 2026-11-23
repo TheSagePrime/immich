@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Mocked, vitest } from 'vitest';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
 import type { RepositoryInterface } from 'src/types.js';
@@ -11,6 +12,7 @@ export const newCryptoRepositoryMock = (): Mocked<RepositoryInterface<CryptoRepo
     hashSha256: vitest.fn().mockImplementation((input) => Buffer.from(`${input} (hashed)`)),
     verifySha256: vitest.fn().mockImplementation(() => true),
     hashSha1: vitest.fn().mockImplementation((input) => Buffer.from(`${input.toString()} (hashed)`)),
+    createSha1: vitest.fn().mockImplementation(() => createHash('sha1')),
     hashFile: vitest.fn().mockImplementation((input) => `${input} (file-hashed)`),
     randomBytesAsText: vitest.fn().mockReturnValue(Buffer.from('random-bytes').toString('base64')),
     signJwt: vitest.fn().mockReturnValue('mock-jwt-token'),

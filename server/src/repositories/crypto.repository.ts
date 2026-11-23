@@ -45,6 +45,10 @@ export class CryptoRepository {
     return createHash('sha1').update(value).digest();
   }
 
+  createSha1() {
+    return createHash('sha1');
+  }
+
   hashFile(filepath: string | Buffer): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
       const hash = createHash('sha1');

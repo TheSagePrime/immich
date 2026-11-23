@@ -104,3 +104,4 @@
 1792568637987-AddAssetOwnerIdUpdateIdIndex
 1795470129477-AddLibraryWritable
 1795560000000-AddAssetOwnerIdOriginalPathPatternIndex
+1795600000000-AddUploadSessionTable

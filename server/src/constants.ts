@@ -212,6 +212,8 @@ export const endpointTags: Record<ApiTag, string> = {
     'Administrative endpoints for managing users, including creating, updating, deleting, and restoring users. Also includes endpoints for resetting passwords and PIN codes.',
   [ApiTag.Users]:
     'Endpoints for viewing and updating the current users, including product key information, profile picture data, onboarding progress, and more.',
+  [ApiTag.UploadSessions]:
+    'Resumable, chunked uploads of files into a folder of a writable external library, with a per-batch choice of what to do with files that already exist.',
   [ApiTag.Views]: 'Endpoints for specialized views, such as the folder view.',
   [ApiTag.Workflows]:
     'A workflow is a set of actions that run whenever a triggering event occurs. Workflows also can include filters to further limit execution.',
@@ -309,3 +311,16 @@ export const AV1_LEVELS: CodecLevel[] = [
   { maxFrame: 35_651_584, maxRate: 2_139_095_040, token: '17M' }, // 6.1
   { maxFrame: 35_651_584, maxRate: 4_278_190_080, token: '18M' }, // 6.2
 ];
+
+export const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
+export const UPLOAD_MAX_CHUNK_SIZE = 32 * 1024 * 1024;
+export const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+export const UPLOAD_SESSION_EXPIRY_REFRESH_MS = 60 * 1000;
+export const UPLOAD_TERMINAL_SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+export const UPLOAD_TEMP_DIR_NAME = '.immich-upload-tmp';
+export const UPLOAD_TEMP_FILE_EXTENSION = '.part';
+export const UPLOAD_MAX_ACTIVE_SESSIONS_PER_USER = 1000;
+export const UPLOAD_FREE_SPACE_MARGIN = 1024 * 1024 * 1024;
+export const UPLOAD_CHECK_MAX_ITEMS = 1000;
+export const UPLOAD_MAX_NUMBERED_NAMES = 1000;
+export const UPLOAD_MAX_DIRECTORY_ENTRIES = 2000;
