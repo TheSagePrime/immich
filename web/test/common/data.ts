@@ -1,3 +1,4 @@
+import { MockFolders } from '#test/common/folders.ts';
 import { adminUserId, factory, type TimelineConfig } from '#test/common/factories.ts';
 import { SeededRandom } from '#test/common/helpers.ts';
 import { payload } from '#test/common/payloads.ts';
@@ -76,6 +77,7 @@ export class MockData {
   readonly queues = payload.queues();
   readonly notifications = payload.notifications();
   readonly backups = payload.backups();
+  readonly folders = new MockFolders();
 
   private preferences = factory.preferences();
   private integrityReport = payload.integrityReport();

@@ -4,6 +4,7 @@
   import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
   import { Route } from '#lib/route.ts';
   import { OnboardingRole } from '#lib/types.ts';
+  import { getHomeRoute } from '#lib/utils/home-route.ts';
   import { setUserOnboarding, updateAdminOnboarding } from '@immich/sdk';
   import {
     mdiCellphoneArrowDownVariant,
@@ -133,7 +134,7 @@
         onboardingDto: { isOnboarded: true },
       });
 
-      await goto(Route.photos());
+      await goto(getHomeRoute(authManager.preferences));
     } else {
       await goto(Route.onboarding({ step: onboardingSteps[nextStepIndex].name }));
     }

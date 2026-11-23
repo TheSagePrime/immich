@@ -1,11 +1,12 @@
 <script lang="ts">
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import FolderBreadcrumbs from '#lib/components/folders/FolderBreadcrumbs.svelte';
+  import FolderCards from '#lib/components/folders/FolderCards.svelte';
   import UserPageLayout, { headerId } from '#lib/components/layouts/UserPageLayout.svelte';
+  import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
-  import TreeBreadcrumbs from '#lib/components/shared-components/tree/TreeBreadcrumbs.svelte';
-  import TreeItemThumbnails from '#lib/components/shared-components/tree/TreeItemThumbnails.svelte';
   import TreeItems from '#lib/components/shared-components/tree/TreeItems.svelte';
   import Sidebar from '#lib/components/sidebar/Sidebar.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
@@ -20,15 +21,36 @@
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import type { Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { createPreloadedQuery, queryClient } from '#lib/queries/client.ts';
-  import { getAssetsByOriginalPathQuery, getFolderTreeQuery } from '#lib/queries/view.query.ts';
+  import {
+    folderViewQueryKey,
+    getAssetsByOriginalPathQuery,
+    getFolderSummaryQuery,
+    getFolderTreeQuery,
+  } from '#lib/queries/view.query.ts';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
+  import {
+    getFolderActions,
+    getFolderAssetActions,
+    getFolderItemActions,
+    getFolderSelectionActions,
+  } from '#lib/services/folder.service.ts';
+  import type { HeaderButtonActionItem } from '#lib/types.ts';
+  import { getFolderCards, type FolderCard } from '#lib/utils/folder-cards.ts';
   import { isAssetViewerRoute } from '#lib/utils/navigation.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
-  import { joinPaths } from '#lib/utils/tree-utils.ts';
   import { ActionButton, CommandPaletteDefaultProvider, IconButton, Text } from '@immich/ui';
-  import { mdiDotsVertical, mdiFolder, mdiFolderHome, mdiFolderOutline, mdiSelectAll } from '@mdi/js';
+  import {
+    mdiCheckboxMultipleMarkedOutline,
+    mdiClose,
+    mdiDotsVertical,
+    mdiFolder,
+    mdiFolderHome,
+    mdiFolderOutline,
+    mdiSelectAll,
+  } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { SvelteSet } from 'svelte/reactivity';
   import { afterNavigate, beforeNavigate, goto, refreshAll } from '$app/navigation';
   import type { PageData } from './$types';
 
@@ -40,12 +62,76 @@
 
   const query = createPreloadedQuery(getFolderTreeQuery);
   const root = $derived(query.data);
+  const summaryQuery = createPreloadedQuery(() => getFolderSummaryQuery(data.folderPath));
+  const summary = $derived(summaryQuery.data);
+  const writable = $derived(summary.writable);
+  const cards = $derived(getFolderCards(summary, data.isTreeNode ? data.tree : undefined));
+
+  const selectedFolders = new SvelteSet<string>();
+  let selectingFolders = $state(false);
 
   const viewport: Viewport = $state({ width: 0, height: 0 });
   let folderScrollContainer: HTMLElement | undefined = $state();
   let savedScrollTop = 0;
 
-  const handleNavigateToFolder = (folderName: string) => navigateToView(joinPaths(data.tree.path, folderName));
+  const handleNavigateToFolder = (card: FolderCard) => navigateToView(card.path);
+
+  const handleToggleFolder = (card: FolderCard) => {
+    if (selectedFolders.has(card.path)) {
+      selectedFolders.delete(card.path);
+    } else {
+      selectedFolders.add(card.path);
+    }
+  };
+
+  const clearFolderSelection = () => {
+    selectedFolders.clear();
+    selectingFolders = false;
+  };
+
+  const handleFolderChange = async () => {
+    clearFolderSelection();
+    assetMultiSelectManager.clear();
+    await queryClient.invalidateQueries({ queryKey: folderViewQueryKey });
+    await refreshAll();
+  };
+
+  const getSelection = () => ({
+    folderPaths: [...selectedFolders],
+    assetIds: assetMultiSelectManager.assets.map((asset) => asset.id),
+  });
+
+  const getCardActions = (card: FolderCard) => {
+    if (!writable) {
+      return [];
+    }
+
+    const { Rename, Move, Delete } = getFolderItemActions($t, card.path, handleFolderChange);
+    return [Rename, Move, Delete];
+  };
+
+  const headerActions = $derived.by((): HeaderButtonActionItem[] => {
+    if (!writable) {
+      return [];
+    }
+
+    const { CreateFolder } = getFolderActions($t, data.folderPath, handleFolderChange);
+    return [
+      CreateFolder,
+      {
+        title: selectingFolders ? $t('cancel') : $t('select_folders'),
+        icon: selectingFolders ? mdiClose : mdiCheckboxMultipleMarkedOutline,
+        onAction: () => (selectingFolders ? clearFolderSelection() : (selectingFolders = true)),
+      },
+    ];
+  });
+
+  const selectionActions = $derived(getFolderSelectionActions($t, getSelection, data.folderPath, handleFolderChange));
+  const singleSelectedAsset = $derived(
+    assetMultiSelectManager.assets.length === 1
+      ? data.pathAssets?.find((asset) => asset.id === assetMultiSelectManager.assets[0].id)
+      : undefined,
+  );
 
   const getLinkForPath = (path: string) => Route.folders({ path });
 
@@ -61,6 +147,7 @@
     if (shallow && type === 'goto') return;
 
     assetMultiSelectManager.clear();
+    clearFolderSelection();
 
     if (isAssetViewerRoute(from) && folderScrollContainer) {
       folderScrollContainer.scrollTop = savedScrollTop;
@@ -73,9 +160,8 @@
 
   const triggerAssetUpdate = async () => {
     assetMultiSelectManager.clear();
-    if (data.tree.path) {
-      await queryClient.invalidateQueries({ queryKey: getAssetsByOriginalPathQuery(data.tree.path).queryKey });
-    }
+    await queryClient.invalidateQueries({ queryKey: getAssetsByOriginalPathQuery(data.folderPath).queryKey });
+    await queryClient.invalidateQueries({ queryKey: getFolderSummaryQuery(data.folderPath).queryKey });
     await refreshAll();
   };
 
@@ -92,7 +178,13 @@
   };
 </script>
 
-<UserPageLayout title={data.meta.title}>
+<UserPageLayout
+  title={data.meta.title}
+  description={summary.directAssetCount > 0
+    ? $t('items_count', { values: { count: summary.directAssetCount } })
+    : undefined}
+  actions={headerActions}
+>
   {#snippet sidebar()}
     <Sidebar>
       <SkipLink target={`#${headerId}`} text={$t('skip_to_folders')} breakpoint="md" />
@@ -112,10 +204,18 @@
 
   <OnEvents onAssetsDelete={refreshAll} onAssetsArchive={triggerAssetUpdate} onAssetsUnarchive={triggerAssetUpdate} />
 
-  <TreeBreadcrumbs node={data.tree} icon={mdiFolderHome} title={$t('folders')} getLink={getLinkForPath} />
+  <FolderBreadcrumbs path={data.folderPath} icon={mdiFolderHome} title={$t('folders')} getLink={getLinkForPath} />
 
   <section class="mt-2 h-[calc(100%-(--spacing(25)))] immich-scrollbar overflow-auto" bind:this={folderScrollContainer}>
-    <TreeItemThumbnails items={data.tree.children} icon={mdiFolder} onClick={handleNavigateToFolder} />
+    <FolderCards
+      items={cards}
+      icon={mdiFolder}
+      selectable={selectingFolders}
+      selected={selectedFolders}
+      getActions={writable ? getCardActions : undefined}
+      onClick={handleNavigateToFolder}
+      onToggle={handleToggleFolder}
+    />
 
     <!-- Assets -->
     {#if data.pathAssets && data.pathAssets.length > 0}
@@ -162,7 +262,18 @@
         }}
       />
 
+      {#if writable}
+        <ActionButton action={selectionActions.Move} />
+      {/if}
+
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
+        {#if writable}
+          {#if singleSelectedAsset}
+            <ActionMenuItem action={getFolderAssetActions($t, singleSelectedAsset, handleFolderChange).RenameFile} />
+          {/if}
+          <ActionMenuItem action={selectionActions.Delete} />
+          <hr />
+        {/if}
         <DownloadAction menuItem />
         <ChangeDate menuItem />
         <ChangeDescription menuItem />
@@ -179,5 +290,19 @@
         <ActionMenuItem action={Actions.TranscodeVideoJob} />
       </ButtonContextMenu>
     </AssetSelectControlBar>
+  </div>
+{:else if writable && selectedFolders.size > 0}
+  <div class="fixed inset-s-0 top-0 w-full">
+    <ControlAppBar onClose={clearFolderSelection} backIcon={mdiClose}>
+      {#snippet leading()}
+        <div class="font-medium text-primary">
+          {$t('selected_folders_count', { values: { count: selectedFolders.size } })}
+        </div>
+      {/snippet}
+      {#snippet trailing()}
+        <ActionButton action={selectionActions.Move} />
+        <ActionButton action={selectionActions.Delete} />
+      {/snippet}
+    </ControlAppBar>
   </div>
 {/if}
