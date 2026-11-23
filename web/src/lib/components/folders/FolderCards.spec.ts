@@ -34,11 +34,11 @@ describe('FolderCards', () => {
     const onToggle = vi.fn();
     const { baseElement, rerender } = await render(FolderCards, { items, icon: mdiFolder, onClick, onToggle });
 
-    baseElement.querySelector<HTMLButtonElement>('[data-testid="folder-card"] button')!.click();
+    baseElement.querySelector<HTMLButtonElement>(':scope [data-testid="folder-card"] button')!.click();
     expect(onClick).toHaveBeenCalledWith(items[0]);
 
     await rerender({ items, icon: mdiFolder, onClick, onToggle, selectable: true, selected: new Set() });
-    baseElement.querySelector<HTMLButtonElement>('[data-testid="folder-card"] button')!.click();
+    baseElement.querySelector<HTMLButtonElement>(':scope [data-testid="folder-card"] button')!.click();
     expect(onToggle).toHaveBeenCalledWith(items[0]);
     expect(onClick).toHaveBeenCalledTimes(1);
   });

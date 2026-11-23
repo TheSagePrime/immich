@@ -48,7 +48,7 @@ export class MockFolders {
   }
 
   uniquePaths() {
-    return [...this.folders.entries()]
+    return [...this.folders]
       .filter(([, assets]) => assets.length > 0)
       .map(([path]) => path)
       .sort();
@@ -66,14 +66,14 @@ export class MockFolders {
     return [...this.writableRoots].find((root) => isInside(root, path));
   }
 
-  summary(input?: string): FolderSummaryResponseDto {
-    const path = normalize(input ?? '/');
+  summary(input = '/'): FolderSummaryResponseDto {
+    const path = normalize(input);
     const root = this.rootOf(path);
     return {
       path,
       directAssetCount: this.assets(path).length,
       children: this.children(path).map((child) => {
-        const assets = [...this.folders.entries()]
+        const assets = [...this.folders]
           .filter(([candidate]) => isInside(child, candidate))
           .flatMap(([, items]) => items);
         return {
@@ -107,16 +107,19 @@ export class MockFolders {
   }
 
   move(source: string, destination: string) {
-    for (const [path, assets] of [...this.folders.entries()]) {
-      if (isInside(source, path)) {
-        this.folders.delete(path);
-        this.folders.set(destination + path.slice(source.length), assets);
+    const entries = [...this.folders];
+    for (const [path, assets] of entries) {
+      if (!isInside(source, path)) {
+        continue;
       }
+
+      this.folders.delete(path);
+      this.folders.set(destination + path.slice(source.length), assets);
     }
   }
 
   remove(path: string) {
-    for (const candidate of [...this.folders.keys()]) {
+    for (const candidate of this.folders.keys()) {
       if (isInside(path, candidate)) {
         this.folders.delete(candidate);
       }

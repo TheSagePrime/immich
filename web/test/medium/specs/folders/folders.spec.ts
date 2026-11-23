@@ -5,9 +5,7 @@ import { expect, test } from '#test/medium/fixtures.ts';
 import { StartPage } from '@immich/sdk';
 
 const enableFolders = (data: MockData, startPage = StartPage.Timeline) =>
-  data.setPreferences(
-    factory.preferences({ folders: { enabled: true, sidebarWeb: true }, navigation: { startPage } }),
-  );
+  data.setPreferences(factory.preferences({ folders: { enabled: true, sidebarWeb: true }, navigation: { startPage } }));
 
 test.describe('folders', () => {
   test('opens the folders when they are the start page', async ({ page, data }) => {
@@ -85,8 +83,8 @@ test.describe('folders', () => {
     await page.getByRole('button', { name: 'move_to_folder' }).click();
     const picker = page.getByRole('dialog');
     await expect(picker.getByTestId('folder-picker-path')).toHaveText('/library');
-    await expect(picker.getByRole('listitem', { name: '/library/b', exact: true })).toBeDisabled();
-    await picker.getByRole('listitem', { name: '/library/c', exact: true }).click();
+    await expect(picker.getByRole('listitem').getByRole('button', { name: 'b', exact: true })).toBeDisabled();
+    await picker.getByRole('listitem').getByRole('button', { name: 'c', exact: true }).click();
     await expect(picker.getByTestId('folder-picker-path')).toHaveText('/library/c');
     await picker.getByRole('button', { name: 'move_here' }).click();
     expect(api.moveFolderItems).toHaveBeenCalledWith({

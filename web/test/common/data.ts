@@ -1,5 +1,5 @@
-import { MockFolders } from '#test/common/folders.ts';
 import { adminUserId, factory, type TimelineConfig } from '#test/common/factories.ts';
+import { MockFolders } from '#test/common/folders.ts';
 import { SeededRandom } from '#test/common/helpers.ts';
 import { payload } from '#test/common/payloads.ts';
 import type { ResponseOf } from '#test/common/types.ts';

@@ -69,27 +69,28 @@
       </Text>
     </HStack>
 
-    <div class="flex max-h-80 immich-scrollbar flex-col overflow-y-auto" role="list">
-      {#if query.isPending}
-        <Text size="small" class="px-4 py-2">{$t('loading')}</Text>
-      {:else if result && result.entries.length === 0}
-        <Text size="small" class="px-4 py-2">{$t('empty_folder')}</Text>
-      {:else if result}
+    {#if query.isPending}
+      <Text size="small" class="px-4 py-2">{$t('loading')}</Text>
+    {:else if result && result.entries.length === 0}
+      <Text size="small" class="px-4 py-2">{$t('empty_folder')}</Text>
+    {:else if result}
+      <ul class="flex max-h-80 immich-scrollbar flex-col overflow-y-auto">
         {#each result.entries as entry (entry.path)}
-          <button
-            type="button"
-            role="listitem"
-            class="flex items-center gap-3 rounded-lg px-4 py-2 text-start hover:bg-immich-primary/10 disabled:opacity-50 dark:hover:bg-immich-primary/40"
-            disabled={isSource(entry.path)}
-            title={entry.path}
-            onclick={() => (path = entry.path)}
-          >
-            <Icon icon={mdiFolderOutline} class="shrink-0 text-primary" size="1.5rem" />
-            <span class="truncate">{entry.name}</span>
-          </button>
+          <li>
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-start hover:bg-immich-primary/10 disabled:opacity-50 dark:hover:bg-immich-primary/40"
+              disabled={isSource(entry.path)}
+              title={entry.path}
+              onclick={() => (path = entry.path)}
+            >
+              <Icon icon={mdiFolderOutline} class="shrink-0 text-primary" size="1.5rem" />
+              <span class="truncate">{entry.name}</span>
+            </button>
+          </li>
         {/each}
-      {/if}
-    </div>
+      </ul>
+    {/if}
   </ModalBody>
   <ModalFooter>
     <HStack fullWidth gap={2}>
