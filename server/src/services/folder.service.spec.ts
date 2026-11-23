@@ -234,6 +234,67 @@ describe(FolderService.name, () => {
       expect(result.failed[0].reason).toBe('Folders can only be moved inside the same library');
     });
 
+    it('should refuse to move a folder that contains the folder of another library', async () => {
+      mocks.library.getAll.mockResolvedValue([libraryFor(), factory.library({ importPaths: [join(root, 'a', 'x')] })]);
+
+      await expect(
+        sut.move(authStub.user1, { folderPaths: [join(root, 'a')], destination: join(root, 'b') }),
+      ).resolves.toEqual({
+        moved: 0,
+        failed: [{ path: join(root, 'a'), reason: 'The folder contains the folder of a library' }],
+      });
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+    });
+
+    it('should keep a sidecar in place when another file shares its name', async () => {
+      const library = libraryFor();
+      mocks.library.getAll.mockResolvedValue([library]);
+      await writeFile(join(root, 'a', 'photo.xmp'), 'xmp');
+      const asset = libraryAsset(join(root, 'a', 'photo.jpg'), {
+        libraryId: library.id,
+        sidecarPath: join(root, 'a', 'photo.xmp'),
+      });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.view.getAssetPathsByIds.mockResolvedValue([asset]);
+      mocks.view.hasOtherAssetsWithStem.mockResolvedValue(true);
+
+      await expect(sut.move(authStub.user1, { assetIds: [asset.id], destination: join(root, 'b') })).resolves.toEqual({
+        moved: 1,
+        failed: [],
+      });
+
+      expect(mocks.view.hasOtherAssetsWithStem).toHaveBeenCalledWith(asset.id, asset.ownerId, join(root, 'a', 'photo'));
+      expect(mocks.storage.link).toHaveBeenCalledTimes(1);
+      expect(mocks.storage.link).toHaveBeenCalledWith(join(root, 'a', 'photo.jpg'), join(root, 'b', 'photo.jpg'));
+      expect(mocks.view.rewritePaths).toHaveBeenCalledWith(
+        expect.objectContaining({ sidecars: [] }),
+        expect.any(Function),
+      );
+    });
+
+    it('should move a sidecar named after the file stem when no other file shares it', async () => {
+      const library = libraryFor();
+      mocks.library.getAll.mockResolvedValue([library]);
+      await writeFile(join(root, 'a', 'photo.xmp'), 'xmp');
+      const asset = libraryAsset(join(root, 'a', 'photo.jpg'), {
+        libraryId: library.id,
+        sidecarPath: join(root, 'a', 'photo.xmp'),
+      });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.view.getAssetPathsByIds.mockResolvedValue([asset]);
+      mocks.view.hasOtherAssetsWithStem.mockResolvedValue(false);
+
+      await expect(sut.renameAsset(authStub.user1, asset.id, { name: 'beach.jpg' })).resolves.toMatchObject({
+        originalPath: join(root, 'a', 'beach.jpg'),
+      });
+
+      expect(mocks.storage.link).toHaveBeenCalledWith(join(root, 'a', 'photo.xmp'), join(root, 'a', 'beach.xmp'));
+      expect(mocks.view.rewritePaths).toHaveBeenCalledWith(
+        expect.objectContaining({ sidecars: [{ assetId: asset.id, path: join(root, 'a', 'beach.xmp') }] }),
+        expect.any(Function),
+      );
+    });
+
     it('should move a folder', async () => {
       await expect(
         sut.move(authStub.user1, { folderPaths: [join(root, 'a')], destination: join(root, 'b') }),
@@ -444,6 +505,46 @@ describe(FolderService.name, () => {
         assetIds: [id],
         userId: authStub.user1.user.id,
       });
+    });
+
+    it('should refuse to trash an asset twice', async () => {
+      const library = libraryFor();
+      mocks.library.getAll.mockResolvedValue([library]);
+      const asset = libraryAsset(join(root, 'a', 'photo.jpg'), { libraryId: library.id, deletedAt: new Date() });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.view.getAssetPathsByIds.mockResolvedValue([asset]);
+
+      const result = await sut.delete(authStub.user1, { assetIds: [asset.id] });
+
+      expect(result.failed).toEqual([{ assetId: asset.id, reason: 'Asset is already in the trash' }]);
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
+    });
+
+    it('should permanently delete an asset that is already in the trash', async () => {
+      const library = libraryFor();
+      mocks.library.getAll.mockResolvedValue([library]);
+      const asset = libraryAsset(join(root, 'a', 'photo.jpg'), { libraryId: library.id, deletedAt: new Date() });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.view.getAssetPathsByIds.mockResolvedValue([asset]);
+
+      await expect(sut.delete(authStub.user1, { assetIds: [asset.id], force: true })).resolves.toMatchObject({
+        deleted: 1,
+        failed: [],
+      });
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith([asset.id], {
+        deletedAt: expect.any(Date),
+        status: AssetStatus.Deleted,
+      });
+    });
+
+    it('should refuse to delete a folder that contains the folder of another library', async () => {
+      mocks.library.getAll.mockResolvedValue([libraryFor(), factory.library({ importPaths: [join(root, 'b')] })]);
+
+      const result = await sut.delete(authStub.user1, { folderPaths: [join(root, 'b')] });
+
+      expect(result.failed).toEqual([{ path: join(root, 'b'), reason: 'The folder contains the folder of a library' }]);
+      expect(mocks.view.trashLibraryFolder).not.toHaveBeenCalled();
+      expect(mocks.storage.removeEmptyDirs).not.toHaveBeenCalled();
     });
 
     it('should count removed empty folders', async () => {

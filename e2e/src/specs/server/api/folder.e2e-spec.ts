@@ -179,6 +179,26 @@ describe('/folders', () => {
     });
   });
 
+  describe('PUT /folders/rename with a nested library', () => {
+    it('should refuse to rename a folder that contains the folder of another library', async () => {
+      utils.createImageFile(`${hostRoot}/nested-parent/nested/e.png`);
+      await utils.createLibrary(admin.accessToken, {
+        ownerId: admin.userId,
+        importPaths: [`${root}/nested-parent/nested`],
+      });
+
+      const { status, body } = await request(app)
+        .put('/folders/rename')
+        .set(asBearerAuth(admin.accessToken))
+        .send({ path: `${root}/nested-parent`, name: 'renamed-parent' });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(expect.objectContaining({ message: 'The folder contains the folder of a library' }));
+      expect(existsSync(`${hostRoot}/nested-parent/nested/e.png`)).toBe(true);
+      expect(existsSync(`${hostRoot}/renamed-parent`)).toBe(false);
+    });
+  });
+
   describe('PUT /folders/move', () => {
     it('should move files into another folder', async () => {
       const [assetId] = await getAssetIds(`${root}/trip`);

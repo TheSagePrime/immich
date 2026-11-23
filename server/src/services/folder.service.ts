@@ -193,7 +193,7 @@ export class FolderService extends BaseService {
       const assetIds: string[] = [];
       for (const asset of assets) {
         try {
-          if (asset.deletedAt) {
+          if (asset.deletedAt && !dto.force) {
             throw new BadRequestException('Asset is already in the trash');
           }
           await this.resolveAssetTarget(libraries, asset);
@@ -212,6 +212,7 @@ export class FolderService extends BaseService {
         try {
           const folder = await this.resolveTarget(libraries, folderPath);
           this.requireNotRoot(folder);
+          await this.requireNoLibraryFolderInside(folder);
           await this.requireDirectory(folder.realPath);
           await this.requireWritable(folder);
 
@@ -351,6 +352,16 @@ export class FolderService extends BaseService {
     }
   }
 
+  private async requireNoLibraryFolderInside(target: Target) {
+    const libraries = await this.libraryRepository.getAll();
+    const containsLibraryFolder = libraries.some((library) =>
+      library.importPaths.some((importPath) => isPathInside(target.path, normalizeFolderPath(importPath))),
+    );
+    if (containsLibraryFolder) {
+      throw new BadRequestException('The folder contains the folder of a library');
+    }
+  }
+
   private async requireWritable(target: Target) {
     if (!(await this.storageRepository.checkFileExists(target.realPath, constants.W_OK))) {
       throw new BadRequestException('Folder is not writable by the server');
@@ -419,6 +430,7 @@ export class FolderService extends BaseService {
   private async moveFolder(libraries: Library[], sourcePath: string, destinationPath: string, newName?: string) {
     const source = await this.resolveTarget(libraries, sourcePath);
     this.requireNotRoot(source);
+    await this.requireNoLibraryFolderInside(source);
     await this.requireDirectory(source.realPath);
     await this.requireWritable({ ...source, realPath: posix.dirname(source.realPath) });
 
@@ -554,24 +566,35 @@ export class FolderService extends BaseService {
     const sourceStem = posix.parse(sourcePath).name;
     const targetStem = posix.parse(targetPath).name;
 
-    const candidates = new Map<string, string>([
-      [`${sourcePath}.xmp`, `${targetPath}.xmp`],
-      [posix.join(sourceDirectory, `${sourceStem}.xmp`), posix.join(targetDirectory, `${targetStem}.xmp`)],
-    ]);
+    const candidates = new Map<string, string>([[`${sourcePath}.xmp`, `${targetPath}.xmp`]]);
     if (
       asset.sidecarPath &&
       posix.dirname(asset.sidecarPath) === sourceDirectory &&
       !candidates.has(asset.sidecarPath)
     ) {
-      candidates.set(asset.sidecarPath, posix.join(targetDirectory, posix.basename(asset.sidecarPath)));
+      const sidecarName = posix.basename(asset.sidecarPath);
+      const targetName = sidecarName === `${sourceStem}.xmp` ? `${targetStem}.xmp` : sidecarName;
+      candidates.set(asset.sidecarPath, posix.join(targetDirectory, targetName));
     }
 
     const moves: FileMove[] = [];
     for (const [from, to] of candidates) {
       const stats = await this.storageRepository.lstat(toRealPath(from)).catch(() => null);
-      if (stats?.isFile()) {
-        moves.push({ from, to });
+      if (!stats?.isFile()) {
+        continue;
       }
+      const isSharedSidecar =
+        from !== `${sourcePath}.xmp` &&
+        (await this.viewRepository.hasOtherAssetsWithStem(
+          asset.id,
+          asset.ownerId,
+          posix.join(sourceDirectory, sourceStem),
+        ));
+      if (isSharedSidecar) {
+        this.logger.log(`Keeping sidecar ${from} in place because other files share its name`);
+        continue;
+      }
+      moves.push({ from, to });
     }
 
     return moves;

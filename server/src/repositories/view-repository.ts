@@ -193,6 +193,22 @@ export class ViewRepository {
     return !!result;
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.STRING] })
+  async hasOtherAssetsWithStem(assetId: string, ownerId: string, pathWithoutExtension: string) {
+    const prefix = escapeLikePattern(`${pathWithoutExtension}.`);
+    const result = await this.db
+      .selectFrom('asset')
+      .select('id')
+      .where('ownerId', '=', asUuid(ownerId))
+      .where('originalPath', 'like', `${prefix}%`)
+      .where('originalPath', 'not like', `${prefix}%/%`)
+      .where('id', '!=', asUuid(assetId))
+      .limit(1)
+      .executeTakeFirst();
+
+    return !!result;
+  }
+
   async rewritePaths(
     changes: { assets: AssetPathRewrite[]; sidecars: SidecarPathRewrite[]; folders: FolderPrefixRewrite[] },
     beforeCommit: () => Promise<void>,
@@ -256,7 +272,8 @@ export class ViewRepository {
       .set({ deletedAt: new Date(), status })
       .where('libraryId', '=', asUuid(libraryId))
       .where('originalPath', 'like', `${escapeLikePattern(`${folderPath}/`)}%`)
-      .where('deletedAt', 'is', null)
+      .$if(status === AssetStatus.Trashed, (qb) => qb.where('deletedAt', 'is', null))
+      .$if(status === AssetStatus.Deleted, (qb) => qb.where('status', '!=', AssetStatus.Deleted))
       .where('visibility', '!=', AssetVisibility.Hidden)
       .returning(['id', 'originalPath'])
       .execute();

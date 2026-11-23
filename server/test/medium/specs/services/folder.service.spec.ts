@@ -175,6 +175,63 @@ describe(FolderService.name, () => {
     });
   });
 
+  it('should keep a sidecar that another file of the folder shares', async () => {
+    const { sut, ctx, auth, newLibraryAsset, getAsset } = await createContext();
+    const jpeg = await newLibraryAsset(join(root, 'a', 'photo.jpg'));
+    const raw = await newLibraryAsset(join(root, 'a', 'photo.cr2'));
+    const sidecarPath = await createFile(join(root, 'a', 'photo.xmp'), 'xmp');
+    await ctx.newAssetFile({ assetId: jpeg.id, type: AssetFileType.Sidecar, path: sidecarPath });
+    await ctx.newAssetFile({ assetId: raw.id, type: AssetFileType.Sidecar, path: sidecarPath });
+    await mkdir(join(root, 'b'));
+
+    await expect(sut.move(auth, { assetIds: [jpeg.id], destination: join(root, 'b') })).resolves.toEqual({
+      moved: 1,
+      failed: [],
+    });
+
+    await expect(getAsset(jpeg.id)).resolves.toMatchObject({ originalPath: join(root, 'b', 'photo.jpg') });
+    await expect(readFile(sidecarPath, 'utf8')).resolves.toBe('xmp');
+    expect(existsSync(join(root, 'b', 'photo.xmp'))).toBe(false);
+  });
+
+  it('should move a sidecar named after the file stem when the file is renamed', async () => {
+    const { sut, ctx, auth, newLibraryAsset } = await createContext();
+    const photo = await newLibraryAsset(join(root, 'a', 'photo.jpg'));
+    const sidecarPath = await createFile(join(root, 'a', 'photo.xmp'), 'xmp');
+    await ctx.newAssetFile({ assetId: photo.id, type: AssetFileType.Sidecar, path: sidecarPath });
+
+    await sut.renameAsset(auth, photo.id, { name: 'beach.jpg' });
+
+    expect(existsSync(sidecarPath)).toBe(false);
+    await expect(readFile(join(root, 'a', 'beach.xmp'), 'utf8')).resolves.toBe('xmp');
+    const sidecar = await ctx.database
+      .selectFrom('asset_file')
+      .select('path')
+      .where('assetId', '=', photo.id)
+      .executeTakeFirstOrThrow();
+    expect(sidecar.path).toBe(join(root, 'a', 'beach.xmp'));
+  });
+
+  it('should refuse to move a folder that contains the folder of another library', async () => {
+    const { sut, ctx, auth, user, newLibraryAsset, getAsset } = await createContext();
+    const photo = await newLibraryAsset(join(root, 'a', 'photo.jpg'));
+    await mkdir(join(root, 'a', 'nested'));
+    await mkdir(join(root, 'b'));
+    await ctx.get(LibraryRepository).create({
+      ownerId: user.id,
+      name: 'nested',
+      importPaths: [join(root, 'a', 'nested')],
+      exclusionPatterns: [],
+    });
+
+    await expect(sut.move(auth, { folderPaths: [join(root, 'a')], destination: join(root, 'b') })).resolves.toEqual({
+      moved: 0,
+      failed: [{ path: join(root, 'a'), reason: 'The folder contains the folder of a library' }],
+    });
+    expect(existsSync(join(root, 'a', 'nested'))).toBe(true);
+    await expect(getAsset(photo.id)).resolves.toMatchObject({ originalPath: join(root, 'a', 'photo.jpg') });
+  });
+
   it('should not overwrite existing files', async () => {
     const { sut, auth, newLibraryAsset, getAsset } = await createContext();
     const photo = await newLibraryAsset(join(root, 'a', 'photo.jpg'));
@@ -244,6 +301,24 @@ describe(FolderService.name, () => {
     await expect(getAsset(photo.id)).resolves.toMatchObject({ status: AssetStatus.Trashed });
     expect(existsSync(join(root, 'a', 'photo.jpg'))).toBe(true);
     expect(existsSync(join(root, 'empty'))).toBe(false);
+  });
+
+  it('should permanently delete the trashed and active assets of a folder with force', async () => {
+    const { sut, auth, newLibraryAsset, getAsset } = await createContext();
+    const active = await newLibraryAsset(join(root, 'a', 'active.jpg'));
+    const trashed = await newLibraryAsset(join(root, 'a', 'trashed.jpg'), {
+      deletedAt: new Date(),
+      status: AssetStatus.Trashed,
+    });
+
+    await expect(sut.delete(auth, { folderPaths: [join(root, 'a')], force: true })).resolves.toMatchObject({
+      trashed: 0,
+      deleted: 2,
+      failed: [],
+    });
+
+    await expect(getAsset(active.id)).resolves.toMatchObject({ status: AssetStatus.Deleted });
+    await expect(getAsset(trashed.id)).resolves.toMatchObject({ status: AssetStatus.Deleted });
   });
 
   it('should refuse libraries that are not writable', async () => {

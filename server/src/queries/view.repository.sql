@@ -137,6 +137,19 @@ where
 limit
   $4
 
+-- ViewRepository.hasOtherAssetsWithStem
+select
+  "id"
+from
+  "asset"
+where
+  "ownerId" = $1::uuid
+  and "originalPath" like $2
+  and "originalPath" not like $3
+  and "id" != $4::uuid
+limit
+  $5
+
 -- ViewRepository.trashLibraryFolder
 update "asset"
 set

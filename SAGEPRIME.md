@@ -173,7 +173,11 @@ database. See "Rolling back to the official v3.4.2 images" above.
   external assets, `originalFileName` for renamed files and sidecar paths in `asset_file`, for every asset under the
   folder including trashed and offline ones. If the database update fails, the files are moved back. Asset ids do not
   change, so albums, faces, favourites and the mobile app's sync keep working. Sidecars next to a moved file
-  (`photo.jpg.xmp`, `photo.xmp`) and the video of a live photo in the same folder move with it.
+  (`photo.jpg.xmp`, and the recorded sidecar such as `photo.xmp`) and the video of a live photo in the same folder
+  move with it. A sidecar named after the file stem (`photo.xmp`) stays where it is when another file of the folder
+  has the same stem (for example a RAW and JPEG pair), so the other file keeps its sidecar.
+- A folder that contains the import path of any library (also read-only libraries of other users) cannot be renamed,
+  moved or deleted, so a folder operation never takes the files of another library away.
 - Uploaded assets (not in a library) are never moved or renamed.
 - Folder operations run one at a time (database advisory lock `FolderManagement`). The library watcher's unlink
   handler takes the same lock, so a watcher event caused by a move cannot delete the moved asset, and the watcher's
@@ -184,8 +188,8 @@ database. See "Rolling back to the official v3.4.2 images" above.
 - **Default: trash.** The assets of the selected folders and files go to the Immich trash. Their files stay on disk
   and can be restored from the trash. Empty folders (no files at all) are removed from disk right away; a folder that
   still contains files, including files Immich does not know, stays.
-- **Delete permanently (`force`).** The assets are deleted like `DELETE /assets` with `force`, and the background
-  deletion job removes their files from disk. Folders that end up empty are left on disk until they are deleted again.
+- **Delete permanently (`force`).** The assets, including those already in the trash, are deleted like
+  `DELETE /assets` with `force`, and the background deletion job removes their files from disk. Folders that end up empty are left on disk until they are deleted again.
 - **Emptying the trash deletes files.** This is upstream behaviour, but it matters more now: when the trash of a
   writable library asset is emptied or expires, Immich deletes its original file and sidecar from the library folder.
 - Nothing is ever deleted recursively (`rm -rf`) and nothing outside a writable library is touched.
