@@ -2,6 +2,7 @@
   import DestinationFolderPicker from '#lib/components/folder-upload/DestinationFolderPicker.svelte';
   import { folderUploadManager } from '#lib/managers/folder-upload-manager.svelte.ts';
   import { uploadManager } from '#lib/managers/upload-manager.svelte.ts';
+  import { queryClient } from '#lib/queries/client.ts';
   import { getUploadLibrariesQuery } from '#lib/queries/upload-session.query.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
@@ -25,7 +26,10 @@
 
   const { entries, onClose }: Props = $props();
 
-  const librariesQuery = createQuery(() => getUploadLibrariesQuery());
+  const librariesQuery = createQuery(
+    () => getUploadLibrariesQuery(),
+    () => queryClient,
+  );
   const libraries = $derived(librariesQuery.data ?? []);
 
   let selectedLibraryId = $state<string>();

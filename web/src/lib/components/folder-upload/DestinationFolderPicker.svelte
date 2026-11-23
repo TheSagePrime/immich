@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { queryClient } from '#lib/queries/client.ts';
   import { getUploadDirectoriesQuery } from '#lib/queries/upload-session.query.ts';
   import { isValidFolderName, joinUploadPath } from '#lib/utils/chunked-upload.ts';
   import { Button, HelperText, Icon, Input, LoadingSpinner } from '@immich/ui';
@@ -15,7 +16,10 @@
 
   let newFolder = $state('');
   const segments = $derived(path === '' ? [] : path.split('/'));
-  const query = createQuery(() => getUploadDirectoriesQuery(libraryId, path));
+  const query = createQuery(
+    () => getUploadDirectoriesQuery(libraryId, path),
+    () => queryClient,
+  );
   const directories = $derived(query.data?.directories ?? []);
   const isNewFolderValid = $derived(isValidFolderName(newFolder));
 

@@ -3,6 +3,7 @@ import { MockFolders } from '#test/common/folders.ts';
 import { SeededRandom } from '#test/common/helpers.ts';
 import { payload } from '#test/common/payloads.ts';
 import type { ResponseOf } from '#test/common/types.ts';
+import { MockUploadSessions } from '#test/common/upload-sessions.ts';
 import {
   AssetOrder,
   AssetTypeEnum,
@@ -94,6 +95,7 @@ export class MockData {
   private readonly tags = new Map<string, TagResponseDto>();
   private readonly activities = new Map<string, ActivityResponseDto>();
   private readonly libraries = new Map<string, LibraryResponseDto>();
+  readonly uploads = new MockUploadSessions(() => this.libraryList());
 
   getPreferences() {
     return this.preferences;
