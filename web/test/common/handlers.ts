@@ -48,6 +48,14 @@ export const createHandlers = (data: MockData): Handlers => {
       const library = data.updateLibrary(params.id, body);
       return library ? { json: library } : notFound;
     },
+    getUploadLibraries: () => ({ json: data.uploads.libraryList() }),
+    getUploadDirectories: ({ params }) => ({ json: data.uploads.getDirectories(params.id, params.path) }),
+    checkUploadSessions: ({ body }) => ({ json: data.uploads.check(body) }),
+    createUploadSession: ({ body }) => ({ status: 201, json: data.uploads.create(body) }),
+    getUploadSessions: () => ({ json: data.uploads.list() }),
+    getUploadSession: ({ params }) => data.uploads.get(params.id),
+    completeUploadSession: ({ params }) => data.uploads.complete(params.id),
+    cancelUploadSession: ({ params }) => data.uploads.cancel(params.id),
     getUserStatisticsAdmin: () => ({ json: { images: 0, videos: 0, total: 0 } }),
     getUserSessionsAdmin: () => ({ json: [] }),
     getPartners: () => ({ json: [] }),
