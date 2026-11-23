@@ -74,6 +74,7 @@ describe(UploadSessionService.name, () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     expiresAt: new Date(Date.now() + UPLOAD_SESSION_TTL_MS),
+    updateId: newUuid(),
     ...overrides,
   });
 

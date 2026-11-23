@@ -19,6 +19,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   "fileModifiedAt" timestamp with time zone,
   "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
   "updatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+  "updateId" uuid NOT NULL DEFAULT immich_uuid_v7(),
   "expiresAt" timestamp with time zone NOT NULL,
   CONSTRAINT "upload_session_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "user" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT "upload_session_libraryId_fkey" FOREIGN KEY ("libraryId") REFERENCES "library" ("id") ON UPDATE CASCADE ON DELETE CASCADE,

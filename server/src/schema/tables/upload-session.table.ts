@@ -10,7 +10,7 @@ import {
   type Int8,
   type Timestamp,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger } from 'src/decorators.js';
+import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { UploadDuplicatePolicy, UploadOutcome, UploadSessionStatus } from 'src/enum.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
@@ -70,6 +70,9 @@ export class UploadSessionTable {
 
   @UpdateDateColumn()
   updatedAt!: Generated<Timestamp>;
+
+  @UpdateIdColumn()
+  updateId!: Generated<string>;
 
   @Column({ type: 'timestamp with time zone', index: true })
   expiresAt!: Timestamp;
