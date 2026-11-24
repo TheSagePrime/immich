@@ -90,6 +90,7 @@ Files written to disk by fork features stay on disk.
 | ------------------ | ---------------------------------------------------- | -------- | --------------------------------------------------------------------- |
 | Library "writable" | Administration > External Libraries > library > Edit | off      | Lets fork features write files inside the library's first import path |
 | Start page         | Account Settings > Features > Folders                | Timeline | `navigation.startPage` preference: `timeline` or `folders`            |
+| Simple mode        | Administration > Settings > Server Settings          | on       | `server.simpleMode` system setting: hides rarely used sidebar items   |
 
 The foundation adds no environment variables. Folder uploads add none either; their limits are listed in
 "Reliable folder uploads" below.
@@ -282,6 +283,44 @@ All endpoints need the `asset.upload` permission and only work for libraries the
 sessions. Delete the `.immich-upload-tmp` folders in the import paths of writable libraries afterwards; files that were
 already uploaded stay where they are and remain normal library files.
 
+## Simple mode
+
+### What it adds
+
+A system setting, **Simple mode**, that hides rarely used features from the web sidebar for every user. It is on by
+default. Turn it off in Administration > Settings > Server Settings > Simple mode to show everything again (or set
+`server.simpleMode: false` in the config file when one is used).
+
+| Sidebar item                                                                        | Simple mode on                                   | Simple mode off                                  |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| Photos, Sharing, Favorites, Albums, Archive                                         | shown                                            | shown                                            |
+| People, Shared links, Folders, Recently added                                       | shown when enabled in the user's own preferences | shown when enabled in the user's own preferences |
+| Trash                                                                               | shown when trash is enabled                      | shown when trash is enabled                      |
+| Explore, Utilities (duplicates, large files, geolocation, workflows), Locked folder | hidden                                           | shown                                            |
+| Map                                                                                 | hidden                                           | shown when the map is enabled                    |
+| Memories, Tags                                                                      | hidden                                           | shown when enabled in the user's own preferences |
+| Purchase reminder (buy / license) at the bottom of the sidebar                      | hidden                                           | shown                                            |
+
+Upload, search and the account menu in the top bar are not affected. Partners stay on the Sharing page.
+
+Hidden pages are only removed from the navigation: they still open by their address (for example `/explore`, `/map`,
+`/utilities`, `/locked`, `/tags`, `/memories`, `/buy`), and nothing is disabled on the server. The mobile apps are not
+affected.
+
+### API (additive)
+
+- `server.simpleMode` (boolean) is a new field on `AdminConfigDto` (`GET`/`PUT /api/admin/config`, and the deprecated
+  `/api/system-config`) and on `UserConfigDto` (`GET /api/config`, visible to logged-in users). It is not part of the
+  public, unauthenticated config.
+- The mobile OpenAPI patches default it to `false` for older servers.
+
+### Migrations and rollback
+
+No database migration. The value is stored with the rest of the system config, and only when it differs from the
+default. After rolling back to the official `v3.4.2` image, a stored `server.simpleMode: false` is ignored; the official
+server only logs `Unknown keys found` at startup. To remove it, turn simple mode back on before rolling back, or save the
+Server Settings once on the official image.
+
 ## Outbound network calls
 
 The fork must not add hidden network traffic. Every group lists the outbound calls its features make here.
@@ -291,3 +330,4 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
 - Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
   library's import path and the database.
+- Simple mode: none. The setting is read from the server's own config endpoint.
