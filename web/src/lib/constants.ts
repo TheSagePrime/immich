@@ -60,6 +60,7 @@ export enum QueryParameter {
   SMART_SEARCH = 'smartSearch',
   PAGE = 'page',
   PATH = 'path',
+  ROOT = 'root',
 }
 
 export enum SessionStorageKey {

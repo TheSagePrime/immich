@@ -1,5 +1,11 @@
 import type { Handlers } from '#test/common/types.ts';
-import type { AssetResponseDto, FolderBrowseResponseDto, FolderSummaryResponseDto } from '@immich/sdk';
+import {
+  FolderRootKind,
+  type AssetResponseDto,
+  type FolderBrowseResponseDto,
+  type FolderRootDto,
+  type FolderSummaryResponseDto,
+} from '@immich/sdk';
 
 const normalize = (path: string) => {
   const trimmed = path.trim().replaceAll(/\/+$/g, '');
@@ -21,6 +27,8 @@ export class MockFolders {
   private readonly folders = new Map<string, AssetResponseDto[]>();
   private readonly writableRoots = new Set<string>();
   private libraryId = '00000000-0000-4000-a000-000000000001';
+  private readonly rootNames = new Map<string, string>();
+  private uploadsPath?: string;
 
   addFolder(path: string, assets: AssetResponseDto[] = []) {
     let current = normalize(path);
@@ -41,6 +49,41 @@ export class MockFolders {
       this.libraryId = libraryId;
     }
     return this;
+  }
+
+  setRootName(path: string, name: string) {
+    this.rootNames.set(normalize(path), name);
+    return this;
+  }
+
+  setUploadsPath(path: string) {
+    this.uploadsPath = normalize(path);
+    this.addFolder(path);
+    return this;
+  }
+
+  roots(): FolderRootDto[] {
+    const libraries = this.children('/')
+      .filter((path) => path !== this.uploadsPath && !(this.uploadsPath && isInside(path, this.uploadsPath)))
+      .map((path) => this.toRoot(path, FolderRootKind.Library))
+      .filter((root) => root.assetCount > 0 || root.writable);
+    const uploads = this.uploadsPath && this.toRoot(this.uploadsPath, FolderRootKind.Uploads, 'uploads');
+    return uploads && uploads.assetCount > 0 ? [...libraries, uploads] : libraries;
+  }
+
+  private toRoot(path: string, kind: FolderRootKind, id?: string): FolderRootDto {
+    const assets = [...this.folders].filter(([candidate]) => isInside(path, candidate)).flatMap(([, items]) => items);
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    const writable = !!this.rootOf(path);
+    return {
+      id: id ?? `library-${name}`,
+      kind,
+      name: kind === FolderRootKind.Uploads ? 'Uploads' : (this.rootNames.get(path) ?? name),
+      writable,
+      assetCount: assets.length,
+      coverAssetId: assets[0]?.id ?? null,
+      folders: [{ name, path, writable }],
+    };
   }
 
   has(path: string) {
@@ -128,6 +171,7 @@ export class MockFolders {
 }
 
 export const createFolderHandlers = (folders: MockFolders): Handlers => ({
+  getFolderRoots: () => ({ json: folders.roots() }),
   getUniqueOriginalPaths: () => ({ json: folders.uniquePaths() }),
   getAssetsByOriginalPath: ({ params }) => ({ json: folders.assets(params.path) }),
   getFolderSummary: ({ params = {} }) => ({ json: folders.summary(params.path) }),

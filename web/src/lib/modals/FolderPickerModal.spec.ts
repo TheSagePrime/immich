@@ -5,15 +5,16 @@ import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 
 test('lists the writable roots and disables confirming there', async ({ data }) => {
-  data.folders.addWritableRoot('/library');
+  data.folders.addWritableRoot('/library').setRootName('/library', 'Family');
   const onClose = vi.fn();
 
   await render(FolderPickerModal, { onClose });
 
   await expect.element(page.getByTestId('folder-picker-path')).toHaveTextContent('writable_library_folders');
   await expect.element(page.getByRole('button', { name: 'move_here' })).toBeDisabled();
-  await page.getByRole('listitem').getByRole('button', { name: '/library' }).click();
-  await expect.element(page.getByTestId('folder-picker-path')).toHaveTextContent('/library');
+  await page.getByRole('listitem').getByRole('button', { name: 'Family' }).click();
+  await expect.element(page.getByTestId('folder-picker-path')).toHaveTextContent('Family');
+  await expect.element(page.getByTestId('folder-picker-path')).not.toHaveTextContent('/library');
   await expect.element(page.getByRole('button', { name: 'move_here' })).toBeEnabled();
 });
 
@@ -25,7 +26,7 @@ test('disables the moved folder and its descendants', async ({ data }) => {
 
   await expect.element(page.getByRole('listitem').filter({ hasText: 'a' }).getByRole('button')).toBeDisabled();
   await page.getByRole('listitem').filter({ hasText: 'b' }).getByRole('button').click();
-  await expect.element(page.getByTestId('folder-picker-path')).toHaveTextContent('/library/b');
+  await expect.element(page.getByTestId('folder-picker-path')).toHaveTextContent('library › b');
   await page.getByRole('button', { name: 'move_here' }).click();
 
   expect(onClose).toHaveBeenCalledWith('/library/b');

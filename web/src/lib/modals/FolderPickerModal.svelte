@@ -2,6 +2,8 @@
   import FolderNameModal from '#lib/modals/FolderNameModal.svelte';
   import { executeMutation, queryClient } from '#lib/queries/client.ts';
   import { createFolderMutation, getFolderBrowseQuery } from '#lib/queries/folder.query.ts';
+  import { getFolderRootsQuery } from '#lib/queries/view.query.ts';
+  import { getFriendlyFolderPath } from '#lib/utils/folder-roots.ts';
   import { canMoveFoldersTo } from '#lib/utils/folder-utils.ts';
   import { Button, HStack, Icon, IconButton, Modal, ModalBody, ModalFooter, Text, modalManager } from '@immich/ui';
   import { mdiArrowUpLeft, mdiFolderMoveOutline, mdiFolderOutline, mdiFolderPlusOutline } from '@mdi/js';
@@ -24,6 +26,12 @@
     () => queryClient,
   );
   const result = $derived(query.data);
+  const rootsQuery = createQuery(
+    () => getFolderRootsQuery(),
+    () => queryClient,
+  );
+  const getDisplayPath = (entryPath: string) =>
+    getFriendlyFolderPath($t, rootsQuery.data ?? [], entryPath)?.join(' › ');
   const canConfirm = $derived(!!result?.path && canMoveFoldersTo(result.path, folderPaths));
   const isSource = (entryPath: string) => !canMoveFoldersTo(entryPath, folderPaths);
 
@@ -65,7 +73,7 @@
         onclick={goUp}
       />
       <Text class="truncate" size="small" data-testid="folder-picker-path">
-        {result?.path ?? $t('writable_library_folders')}
+        {result?.path ? (getDisplayPath(result.path) ?? result.path) : $t('writable_library_folders')}
       </Text>
     </HStack>
 
@@ -81,11 +89,11 @@
               type="button"
               class="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-start hover:bg-immich-primary/10 disabled:opacity-50 dark:hover:bg-immich-primary/40"
               disabled={isSource(entry.path)}
-              title={entry.path}
+              title={getDisplayPath(entry.path) ?? entry.name}
               onclick={() => (path = entry.path)}
             >
               <Icon icon={mdiFolderOutline} class="shrink-0 text-primary" size="1.5rem" />
-              <span class="truncate">{entry.name}</span>
+              <span class="truncate">{result.path ? entry.name : (getDisplayPath(entry.path) ?? entry.name)}</span>
             </button>
           </li>
         {/each}
