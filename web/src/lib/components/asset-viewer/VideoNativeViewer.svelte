@@ -21,7 +21,6 @@
   import { getSubtitleKind, getSubtitleLabel } from '#lib/utils/subtitles.ts';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
   import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';
-  import { createQuery } from '@tanstack/svelte-query';
   import {
     mdiCheck,
     mdiChevronLeft,
@@ -37,6 +36,7 @@
     mdiVolumeMedium,
     mdiVolumeMute,
   } from '@mdi/js';
+  import { createQuery } from '@tanstack/svelte-query';
   import 'hls-video-element';
   import type HlsVideoElement from 'hls-video-element';
   import Hls, { AbrController, Events, type FragLoadedData, type FragLoadingData, type HlsConfig } from 'hls.js';

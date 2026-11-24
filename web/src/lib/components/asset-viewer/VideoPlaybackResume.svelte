@@ -1,13 +1,13 @@
 <script lang="ts">
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getPlaybackPositionQuery } from '#lib/queries/video-library.query.ts';
-  import { formatPlaybackTime, getResumePosition, PlaybackPositionTracker } from '#lib/utils/playback-position.ts';
+  import { PlaybackPositionTracker, formatPlaybackTime, getResumePosition } from '#lib/utils/playback-position.ts';
   import { deletePlaybackPosition, updatePlaybackPosition } from '@immich/sdk';
   import { Button } from '@immich/ui';
   import { mdiRestart } from '@mdi/js';
   import { createQuery } from '@tanstack/svelte-query';
-  import { t } from 'svelte-i18n';
   import { untrack } from 'svelte';
+  import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
   type Props = {
@@ -128,11 +128,12 @@
 {#if resumedFrom !== null}
   <div
     transition:fade={{ duration: 150 }}
-    class="absolute start-4 bottom-36 z-10 flex items-center gap-3 rounded-xl bg-black/70 py-2 ps-4 pe-2 text-sm text-white"
+    class="absolute inset-s-4 bottom-36 z-10 flex items-center gap-3 rounded-xl bg-black/70 py-2 ps-4 pe-2 text-sm text-white"
     role="status"
     data-testid="video-resume-notice"
   >
     <span>{$t('video_resumed_at', { values: { time: formatPlaybackTime(resumedFrom) } })}</span>
-    <Button size="small" color="secondary" leadingIcon={mdiRestart} onclick={startOver}>{$t('video_start_over')}</Button>
+    <Button size="small" color="secondary" leadingIcon={mdiRestart} onclick={startOver}>{$t('video_start_over')}</Button
+    >
   </div>
 {/if}

@@ -57,7 +57,13 @@ export class PlaybackPositionTracker {
   #position = 0;
   #duration: number | undefined;
 
-  constructor({ save, clear, hasSavedPosition, now = Date.now, intervalMs = PLAYBACK_SAVE_INTERVAL_MS }: PlaybackPositionTrackerOptions) {
+  constructor({
+    save,
+    clear,
+    hasSavedPosition,
+    now = Date.now,
+    intervalMs = PLAYBACK_SAVE_INTERVAL_MS,
+  }: PlaybackPositionTrackerOptions) {
     this.#save = save;
     this.#clear = clear;
     this.#now = now;

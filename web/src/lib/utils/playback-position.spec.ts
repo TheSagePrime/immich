@@ -1,8 +1,8 @@
 import {
-  formatPlaybackTime,
-  getResumePosition,
   PLAYBACK_SAVE_INTERVAL_MS,
   PlaybackPositionTracker,
+  formatPlaybackTime,
+  getResumePosition,
 } from '#lib/utils/playback-position.ts';
 
 describe('getResumePosition', () => {
@@ -17,7 +17,7 @@ describe('getResumePosition', () => {
     [111, 120, null],
     [30, 45, null],
     [30, null, 30],
-    [Number.NaN, 600, null],
+    [NaN, 600, null],
   ])('should resume %s of %s at %s', (position, duration, expected) => {
     expect(getResumePosition(position, duration)).toBe(expected);
   });

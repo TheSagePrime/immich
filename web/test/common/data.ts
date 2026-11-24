@@ -4,7 +4,7 @@ import { SeededRandom } from '#test/common/helpers.ts';
 import { payload } from '#test/common/payloads.ts';
 import type { ResponseOf } from '#test/common/types.ts';
 import { MockUploadSessions } from '#test/common/upload-sessions.ts';
-import { isInFolder, VideoLibraryData } from '#test/common/video-library.ts';
+import { VideoLibraryData, isInFolder } from '#test/common/video-library.ts';
 import {
   AssetOrder,
   AssetTypeEnum,

@@ -46,7 +46,7 @@
   const options: TimelineManagerOptions = $derived({
     visibility: AssetVisibility.Timeline,
     assetType: AssetTypeEnum.Video,
-    ...(folder.path ? { folder: folder.path } : {}),
+    ...(folder.path && { folder: folder.path }),
   });
 
   const getLink = (path: string) => Route.videos(path ? { path } : undefined);
@@ -74,7 +74,12 @@
       <section>
         <Text class="mb-4 ps-4" size="small">{$t('video_folders')}</Text>
         <div class="h-full" data-testid="video-folder-tree">
-          <TreeItems icons={{ default: mdiFolderOutline, active: mdiFolder }} tree={root} active={folder.path} {getLink} />
+          <TreeItems
+            icons={{ default: mdiFolderOutline, active: mdiFolder }}
+            tree={root}
+            active={folder.path}
+            {getLink}
+          />
         </div>
       </section>
     </Sidebar>
