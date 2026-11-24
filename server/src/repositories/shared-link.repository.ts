@@ -13,7 +13,7 @@ import { omit } from 'lodash-es';
 import { InjectKysely } from 'nestjs-kysely';
 import { Album, columns } from 'src/database.js';
 import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
-import { AlbumUserRole, SharedLinkType } from 'src/enum.js';
+import { AlbumUserRole, AssetVisibility, SharedLinkType } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
@@ -32,6 +32,7 @@ const withSharedAssets = (eb: ExpressionBuilder<DB, 'shared_link'>) => {
     .whereRef('shared_link.id', '=', 'shared_link_asset.sharedLinkId')
     .innerJoin('asset', 'asset.id', 'shared_link_asset.assetId')
     .where('asset.deletedAt', 'is', null)
+    .where('asset.visibility', '!=', sql.lit(AssetVisibility.Locked))
     .selectAll('asset')
     .orderBy('asset.fileCreatedAt', 'asc');
 };

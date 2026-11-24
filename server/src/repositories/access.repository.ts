@@ -268,6 +268,7 @@ class AssetAccess {
       )
       .select(['asset.id', 'asset.livePhotoVideoId'])
       .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', '!=', sql.lit(AssetVisibility.Locked))
       .where((eb) =>
         eb.or([
           eb('asset.id', '=', eb.fn.any('target.ids')),

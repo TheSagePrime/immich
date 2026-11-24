@@ -94,7 +94,7 @@ export class HlsService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [assetId] });
 
     const session = await this.videoStreamRepository.getSession(sessionId);
-    if (!session) {
+    if (!session || session.assetId !== assetId) {
       throw new NotFoundException('Session not found');
     }
 
@@ -122,6 +122,11 @@ export class HlsService extends BaseService {
 
   async endSession(auth: AuthDto, assetId: string, sessionId: string): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [assetId] });
+
+    const session = await this.videoStreamRepository.getSession(sessionId);
+    if (!session || session.assetId !== assetId) {
+      return;
+    }
 
     this.websocketRepository.serverSend('HlsSessionEnd', { sessionId });
   }
