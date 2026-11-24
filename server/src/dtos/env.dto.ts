@@ -1,5 +1,6 @@
 import z from 'zod';
 import { ImmichEnvironmentSchema, LogFormatSchema, LogLevelSchema } from 'src/enum.js';
+import { OutboundAllowlist } from 'src/utils/safe-fetch.js';
 import { IsIPRange } from 'src/validation.js';
 
 // TODO import from sql-tools once the swagger plugin supports external enums
@@ -34,6 +35,25 @@ const trustedProxiesSchema = z
 
   .pipe(z.union([z.undefined(), IsIPRange({ requireCIDR: false })]));
 
+const outboundAllowedHostsSchema = z
+  .string()
+  .optional()
+  .transform((s) =>
+    s
+      ? s
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean)
+      : undefined,
+  )
+  .superRefine((entries, ctx) => {
+    try {
+      new OutboundAllowlist(entries);
+    } catch (error) {
+      ctx.addIssue({ code: 'custom', message: (error as Error).message, input: entries });
+    }
+  });
+
 export const EnvSchema = z
   .object({
     IMMICH_API_METRICS_PORT: z.coerce.number().int().optional(),
@@ -67,6 +87,7 @@ export const EnvSchema = z
     IMMICH_THIRD_PARTY_SUPPORT_URL: z.string().optional(),
     IMMICH_ALLOW_SETUP: stringBool.optional(),
     IMMICH_TRUSTED_PROXIES: trustedProxiesSchema,
+    IMMICH_OUTBOUND_ALLOWED_HOSTS: outboundAllowedHostsSchema,
     IMMICH_WORKERS_INCLUDE: z.string().optional(),
     IMMICH_WORKERS_EXCLUDE: z.string().optional(),
     DB_DATABASE_NAME: z.string().optional(),

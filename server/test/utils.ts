@@ -363,7 +363,9 @@ export const getMocks = () => {
     move: automock(MoveRepository, { strict: false }),
     notification: automock(NotificationRepository),
     ocr: automock(OcrRepository, { strict: false }),
-    oauth: automock(OAuthRepository, { args: [loggerMock] }),
+    oauth: automock(OAuthRepository, {
+      args: [loggerMock, { getEnv: () => ({ network: { outboundAllowedHosts: [] } }) }],
+    }),
     partner: automock(PartnerRepository, { strict: false }),
     passkey: automock(PasskeyRepository),
     person: automock(PersonRepository, { strict: false }),

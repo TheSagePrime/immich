@@ -14,6 +14,7 @@ const resetEnv = () => {
     'IMMICH_WORKERS_INCLUDE',
     'IMMICH_WORKERS_EXCLUDE',
     'IMMICH_TRUSTED_PROXIES',
+    'IMMICH_OUTBOUND_ALLOWED_HOSTS',
     'IMMICH_API_METRICS_PORT',
     'IMMICH_MEDIA_LOCATION',
     'IMMICH_MICROSERVICES_METRICS_PORT',
@@ -265,6 +266,7 @@ describe('getEnv', () => {
       const { network } = getEnv();
       expect(network).toEqual({
         trustedProxies: ['linklocal', 'uniquelocal'],
+        outboundAllowedHosts: [],
       });
     });
 
@@ -273,7 +275,19 @@ describe('getEnv', () => {
       const { network } = getEnv();
       expect(network).toEqual({
         trustedProxies: ['10.1.0.0', '10.2.0.0', '169.254.0.0/16'],
+        outboundAllowedHosts: [],
       });
+    });
+
+    it('should parse the outbound allowlist', () => {
+      process.env.IMMICH_OUTBOUND_ALLOWED_HOSTS = 'auth.internal, *.lan,10.0.0.0/8 ,';
+      const { network } = getEnv();
+      expect(network.outboundAllowedHosts).toEqual(['auth.internal', '*.lan', '10.0.0.0/8']);
+    });
+
+    it('should reject an invalid outbound allowlist', () => {
+      process.env.IMMICH_OUTBOUND_ALLOWED_HOSTS = 'https://auth.internal';
+      expect(() => getEnv()).toThrow('Invalid outbound allowlist entry');
     });
 
     it('should reject invalid trusted proxies', () => {
