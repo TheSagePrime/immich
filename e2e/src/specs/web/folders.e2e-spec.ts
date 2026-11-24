@@ -49,11 +49,11 @@ test.describe('Folders', () => {
       await expect(cards.first()).toBeVisible();
       await cards.first().getByRole('button').first().click();
 
-      await expect(page).toHaveURL(/\/folders\?path=/);
+      await expect(page).toHaveURL(/\/folders\?root=uploads/);
       await expectMainSidebar(page);
-      const folderName = originalPath.split('/').at(-2)!;
       await expect(page.getByRole('main').getByRole('link', { name: 'Folders', exact: true })).toBeVisible();
-      await expect(page.getByRole('main').getByText(folderName, { exact: true })).toBeVisible();
+      await expect(page.getByTestId('folder-breadcrumbs')).toContainText('Phone uploads');
+      await expect(page.getByTestId('folder-breadcrumbs')).not.toContainText(originalPath.split('/', 2)[1]);
 
       expect(openedPages).toEqual([]);
       expect(context.pages()).toHaveLength(1);

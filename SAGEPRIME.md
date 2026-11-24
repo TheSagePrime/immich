@@ -154,7 +154,7 @@ database. See "Rolling back to the official v3.4.2 images" above.
   (`navigation.startPage`, `timeline` by default). The root URL, the logo and the end of onboarding open the start
   page; after login, an explicit `continue` URL still wins.
 - **Covers, counts and breadcrumbs.** Every child folder shows the number of assets in it (including subfolders) and
-  the newest asset as cover. Breadcrumbs show every path segment and every segment is a link.
+  the newest asset as cover. Breadcrumbs show every folder name and every segment is a link (see "Friendly names").
 - **Same layout as the rest of the app.** The Folders page keeps the main sidebar (with Folders highlighted) and shows
   folders as an album-style grid of cards; a folder shows its subfolders on top and its photos below. There is no
   separate folder tree panel.
@@ -178,6 +178,64 @@ database. See "Rolling back to the official v3.4.2 images" above.
 
 `GET /view/folder/unique-paths` and `GET /view/folder`, which the mobile app uses, are unchanged.
 `UserPreferencesResponseDto` gains an optional `navigation` object; no existing field changed.
+
+### Friendly names
+
+- **Roots instead of server paths.** The top level of `/folders` shows one card per library that holds assets of the
+  signed-in user (named after the library, for example "Media"), one per writable library the user manages (also
+  when it is still empty), and "Phone uploads" for the assets uploaded to Immich itself (not in any library). Empty
+  read-only libraries and an empty "Phone uploads" are not shown.
+- **Only folder names.** Inside a root every card shows only the folder's own name and the breadcrumbs read like
+  `Folders > Media > Trips > Goa`. The library import path and the upload location (`upload/<user id>`,
+  `library/<storage label>`) are never shown; neither is the absolute path in the move picker.
+- **Roots with several locations.** A library with several import paths, or uploads stored both in `upload/` and
+  `library/`, first lists its locations as cards (last folder name, more segments only where names would clash).
+- **URLs.** Folders are addressed as `/folders?root=<library id|uploads>&path=<relative path>`. Old links with an
+  absolute `?path=` (bookmarks, the "open folder" link of the detail panel) redirect to the new form; a path outside
+  every root still opens as before.
+
+### File-manager actions
+
+- **Context menu** on right-click, from the card's menu button and on long-press (touch) for folder cards and photos:
+  Open, New folder, Rename, Move to folder, Delete, Upload folder here and Download (a folder downloads as a zip of
+  all its assets including subfolders, a photo downloads its original). The menu is keyboard reachable (arrow keys,
+  Home, End, Enter, Escape) and returns focus where it came from.
+- **Read-only places.** Outside writable libraries (read-only libraries and "Phone uploads") the write items and the
+  toolbar's New folder button stay visible but disabled with the hint "Read-only library"; Open and Download work.
+- **Selection.** Ctrl/Cmd-click toggles a folder or a photo, Shift-click selects a range of folders in display order
+  (the existing Shift range of photos keeps working), and bulk Move and Delete work on mixed selections.
+- **Drag and drop.** Drag a folder or photo (or the whole selection when the dragged item is selected) onto a folder
+  card or a breadcrumb to move it; the target is highlighted and the usual "moved" toast is shown.
+- **Keyboard.** F2 renames the single selected folder or photo, Enter opens it, Delete or Backspace deletes the
+  selection after the usual confirmation, Ctrl/Cmd+A selects all folders and photos and Escape clears the selection.
+  Keys typed into inputs, dialogs and the open menu are left alone.
+
+### Sorting
+
+- The Sort menu in the toolbar orders the folder cards and the photos of the folder: Name (A-Z / Z-A), Date taken
+  (newest / oldest), Date added (newest / oldest) and File size (largest / smallest). Folders always stay above the
+  photos.
+- Names sort naturally and ignore case ("Day 2" before "Day 10"), in the browser and for the server's folder list.
+- Metrics of a subfolder, over every asset in it including its subfolders: date taken is the newest `fileCreatedAt`
+  when sorting newest first and the oldest one when sorting oldest first; date added does the same with `createdAt`;
+  file size is the total `fileSizeInByte`. Folders without assets go last, ties sort by name.
+- Photos are sorted over the whole folder: `GET /view/folder` already returns every asset of the folder in one
+  response, so no paging is involved.
+- The choice is stored per user and per folder in the user preferences (`folders.sortOverrides`, at most 500 folders,
+  the oldest is dropped). The last choice also becomes `folders.sortBy`/`folders.sortOrder`, the sort of folders that
+  were never sorted. The default is Name A-Z. No migration is needed.
+
+### API added for friendly names, actions and sorting (all additive)
+
+| Endpoint or field                        | What it adds                                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `GET /view/folder/roots` (`folder.read`) | Roots with `id`, `kind`, `name`, `writable`, `assetCount`, `coverAssetId`, and their top level `folders` |
+| `FolderSummaryItemDto`                   | Optional `newestTakenAt`, `oldestTakenAt`, `newestAddedAt`, `oldestAddedAt`, `totalSize`                 |
+| `DownloadInfoDto.folderPath`             | Optional; the assets of the signed-in user in that folder and its subfolders (refused for shared links)  |
+| `FoldersResponse` / `FoldersUpdate`      | Optional `sortBy`, `sortOrder`, `sortOverrides`                                                          |
+
+The paths in the roots response are the same absolute folder paths that `GET /view/folder/unique-paths` and the summary
+already return to the same user; the web app only uses them to call the existing endpoints.
 
 ### How the file operations stay safe
 
