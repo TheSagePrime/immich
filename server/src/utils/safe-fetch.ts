@@ -2,7 +2,7 @@ import { lookup as dnsLookup } from 'node:dns/promises';
 import http, { IncomingMessage } from 'node:http';
 import https from 'node:https';
 import { BlockList, LookupFunction, isIP } from 'node:net';
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 import { serverVersion } from 'src/constants.js';
 
@@ -21,6 +21,8 @@ export type SafeFetchOptions = {
   resolver?: HostResolver;
   maxRedirects?: number;
   timeout?: number;
+  maxResponseSize?: number;
+  isUrlAllowed?: (url: URL) => boolean;
 };
 
 export type SafeFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -89,6 +91,7 @@ const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
 const CROSS_ORIGIN_STRIPPED_HEADERS = ['authorization', 'cookie', 'proxy-authorization'];
 const DEFAULT_MAX_REDIRECTS = 5;
 const DEFAULT_TIMEOUT = 30_000;
+const DEFAULT_MAX_RESPONSE_SIZE = 50 * 1024 * 1024;
 
 const parseGroups = (part: string) =>
   part
@@ -344,7 +347,37 @@ const decode = (response: IncomingMessage): Readable => {
   }
 };
 
-const toResponse = (message: IncomingMessage, url: URL, method: string, redirected: boolean): Response => {
+export class ResponseTooLargeError extends Error {
+  constructor(maxResponseSize: number) {
+    super(`Response body is larger than ${maxResponseSize} bytes`);
+    this.name = 'ResponseTooLargeError';
+  }
+}
+
+const limitSize = (stream: Readable, maxResponseSize: number): Readable => {
+  let received = 0;
+  const limiter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      received += chunk.length;
+      if (received > maxResponseSize) {
+        callback(new ResponseTooLargeError(maxResponseSize));
+        return;
+      }
+      callback(null, chunk);
+    },
+  });
+  stream.on('error', (error) => limiter.destroy(error));
+  limiter.on('error', () => stream.destroy());
+  return stream.pipe(limiter);
+};
+
+const toResponse = (
+  message: IncomingMessage,
+  url: URL,
+  method: string,
+  redirected: boolean,
+  maxResponseSize: number,
+): Response => {
   const status = message.statusCode ?? 0;
   if (status < 200 || status > 599) {
     message.destroy();
@@ -360,13 +393,19 @@ const toResponse = (message: IncomingMessage, url: URL, method: string, redirect
   if (method === 'HEAD' || NULL_BODY_STATUSES.has(status)) {
     message.resume();
   } else {
+    const contentLength = Number(message.headers['content-length']);
+    if (Number.isFinite(contentLength) && contentLength > maxResponseSize) {
+      message.destroy();
+      throw new ResponseTooLargeError(maxResponseSize);
+    }
+
     const stream = decode(message);
     if (stream !== message) {
       headers.delete('content-encoding');
       headers.delete('content-length');
       message.on('error', (error) => stream.destroy(error));
     }
-    body = Readable.toWeb(stream) as ReadableStream;
+    body = Readable.toWeb(limitSize(stream, maxResponseSize)) as ReadableStream;
   }
 
   const response = new Response(body, { status, statusText: message.statusMessage, headers });
@@ -428,6 +467,7 @@ export const createSafeFetch = (options: SafeFetchOptions = {}): SafeFetch => {
   const resolver = options.resolver ?? defaultResolver;
   const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+  const maxResponseSize = options.maxResponseSize ?? DEFAULT_MAX_RESPONSE_SIZE;
 
   return async (input, init) => {
     const request = await normalizeInput(input, init);
@@ -455,6 +495,10 @@ export const createSafeFetch = (options: SafeFetchOptions = {}): SafeFetch => {
         throw new OutboundRequestBlockedError('Outbound request URLs must not contain credentials');
       }
 
+      if (options.isUrlAllowed && !options.isUrlAllowed(url)) {
+        throw new OutboundRequestBlockedError(`Outbound request to ${url.hostname} is not allowed`);
+      }
+
       signal.throwIfAborted();
       const target = await resolveAllowedAddress(url.hostname, allowlist, resolver);
       const message = await send({ url, method, headers, body, signal }, target);
@@ -462,7 +506,7 @@ export const createSafeFetch = (options: SafeFetchOptions = {}): SafeFetch => {
       const location = message.headers.location;
 
       if (!REDIRECT_STATUSES.has(status) || !location || request.redirect === 'manual') {
-        return toResponse(message, url, method, redirects > 0);
+        return toResponse(message, url, method, redirects > 0, maxResponseSize);
       }
 
       message.resume();

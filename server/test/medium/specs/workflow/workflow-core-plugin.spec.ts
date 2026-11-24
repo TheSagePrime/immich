@@ -1184,6 +1184,40 @@ describe('core plugin', () => {
         await new Promise((resolve) => server.close(resolve));
       }
     });
+
+    it('should not send a webhook to a private address that is not allowlisted', async () => {
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      const requests: string[] = [];
+      const server = createServer((request, response) => {
+        requests.push(`${request.method} ${request.url}`);
+        response.writeHead(200);
+        response.end();
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.2', resolve));
+      const { port } = server.address() as AddressInfo;
+
+      try {
+        const workflow = await createWorkflow({
+          ownerId: user.id,
+          trigger: WorkflowTrigger.AssetCreate,
+          steps: [
+            {
+              method: 'immich-plugin-core#webhook',
+              config: { url: `http://127.0.0.2:${port}/hook`, method: 'POST' },
+            },
+          ],
+        });
+
+        await ctx.sut
+          .handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id, trigger: WorkflowTrigger.AssetCreate })
+          .catch(() => {});
+        expect(requests).toEqual([]);
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
+    });
   });
 
   describe('step order', () => {

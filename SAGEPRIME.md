@@ -304,7 +304,9 @@ reserved, documentation or benchmarking space, including IPv4 addresses hidden i
 addresses, and then connects to exactly the address it checked, so a DNS answer that changes between the check and the
 connection (DNS rebinding) cannot redirect it. Redirects are followed by hand (at most 5), every hop is checked again,
 only `http` and `https` are allowed, URLs with credentials are refused and `Authorization` and `Cookie` headers are
-dropped when a redirect leaves the origin.
+dropped when a redirect leaves the origin. Response bodies are limited to 50 MiB after decompression (10 MiB for
+workflow plugins), so a huge or compressed "bomb" response cannot exhaust memory. For workflow plugins every redirect
+hop must also match the plugin manifest's `allowedHosts`, so a redirect cannot leave the hosts the plugin declared.
 
 An OAuth provider (or a plugin target) on the local network needs an explicit allowlist:
 
@@ -379,10 +381,10 @@ restarts. Settings: Administration > Settings > Authentication > Password Login 
 - An attacker who knows an email address can keep that account locked for password logins. With the defaults a
   lockout lasts at most an hour and OAuth or passkey login still work.
 - **Behind a reverse proxy**, Immich only sees the real client address when the proxy is trusted. The default trusts
-  loopback, link-local and unique-local addresses; for a proxy on a Docker bridge network (for example `172.18.0.0/16`)
-  set `IMMICH_TRUSTED_PROXIES`. Otherwise every request seems to come from the proxy and the IP limit applies to all
-  clients together (set `ipMaxFailures` to `0` in that case). For more protection, also rate limit `/api/auth/login`
-  in the reverse proxy.
+  loopback, link-local and private addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), which
+  covers a proxy on a Docker bridge network. A proxy on a public address must be added with `IMMICH_TRUSTED_PROXIES`.
+  Otherwise every request seems to come from the proxy and the IP limit applies to all clients together (set
+  `ipMaxFailures` to `0` in that case). For more protection, also rate limit `/api/auth/login` in the reverse proxy.
 
 There was no per-IP limit before. There is still no general request rate limit; use the reverse proxy for that.
 

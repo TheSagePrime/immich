@@ -6,6 +6,7 @@ import {
   HostResolver,
   OutboundAllowlist,
   OutboundRequestBlockedError,
+  ResponseTooLargeError,
   createSafeFetch,
   isPrivateAddress,
   resolveAllowedAddress,
@@ -217,6 +218,22 @@ describe('createSafeFetch', () => {
           response.end();
           return;
         }
+        case '/large': {
+          response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': '2048' });
+          response.end(Buffer.alloc(2048));
+          return;
+        }
+        case '/chunked': {
+          response.writeHead(200, { 'content-type': 'application/octet-stream' });
+          response.write(Buffer.alloc(1024));
+          response.end(Buffer.alloc(1024));
+          return;
+        }
+        case '/bomb': {
+          response.writeHead(200, { 'content-type': 'text/plain', 'content-encoding': 'gzip' });
+          response.end(gzipSync(Buffer.alloc(64 * 1024)));
+          return;
+        }
         case '/empty': {
           response.writeHead(204);
           response.end();
@@ -289,6 +306,48 @@ describe('createSafeFetch', () => {
     expect(response.status).toBe(200);
     expect(bodies.at(-1)).toBe('grant_type=authorization_code&code=abc');
     expect(requests.at(-1)?.headers['content-type']).toBe('application/x-www-form-urlencoded;charset=UTF-8');
+  });
+
+  it('should reject a response with a declared length above the limit', async () => {
+    const safeFetch = createSafeFetch({ allowedHosts: ['127.0.0.1'], maxResponseSize: 1024 });
+
+    await expect(safeFetch(`http://127.0.0.1:${port}/large`)).rejects.toBeInstanceOf(ResponseTooLargeError);
+  });
+
+  it('should stop reading a streamed response once it exceeds the limit', async () => {
+    const safeFetch = createSafeFetch({ allowedHosts: ['127.0.0.1'], maxResponseSize: 1500 });
+
+    const response = await safeFetch(`http://127.0.0.1:${port}/chunked`);
+    await expect(response.arrayBuffer()).rejects.toThrow();
+  });
+
+  it('should apply the limit to the decompressed body', async () => {
+    const safeFetch = createSafeFetch({ allowedHosts: ['127.0.0.1'], maxResponseSize: 4096 });
+
+    const response = await safeFetch(`http://127.0.0.1:${port}/bomb`);
+    await expect(response.text()).rejects.toThrow();
+  });
+
+  it('should read a response within the limit', async () => {
+    const safeFetch = createSafeFetch({ allowedHosts: ['127.0.0.1'], maxResponseSize: 2048 });
+
+    const response = await safeFetch(`http://127.0.0.1:${port}/chunked`);
+    await expect(response.arrayBuffer()).resolves.toHaveProperty('byteLength', 2048);
+  });
+
+  it('should check every hop against the url filter', async () => {
+    const safeFetch = createSafeFetch({
+      allowedHosts: ['127.0.0.1', 'localhost'],
+      isUrlAllowed: (url) => url.hostname === '127.0.0.1',
+    });
+
+    await expect(safeFetch(`http://127.0.0.1:${port}/redirect?to=/ok`)).resolves.toHaveProperty('status', 200);
+    const count = requests.length;
+    await expect(
+      safeFetch(`http://127.0.0.1:${port}/redirect?to=${encodeURIComponent(`http://localhost:${port}/ok`)}`),
+    ).rejects.toBeInstanceOf(OutboundRequestBlockedError);
+    expect(requests.length).toBe(count + 1);
+    await expect(safeFetch(`http://localhost:${port}/ok`)).rejects.toBeInstanceOf(OutboundRequestBlockedError);
   });
 
   it('should decompress gzip responses', async () => {

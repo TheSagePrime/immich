@@ -34,6 +34,8 @@ import type { JobOf } from 'src/types.js';
 import { createSafeFetch } from 'src/utils/safe-fetch.js';
 import { isAllowedHost } from 'src/utils/workflow.js';
 
+const WORKFLOW_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+
 const dummy = () => {
   throw new Error(
     `Calling host functions is not allowed without setting methods[].hostFunctions=true in the plugin manifest`,
@@ -84,7 +86,7 @@ export class WorkflowExecutionService extends BaseService {
     const addAssetsToAlbums = this.wrap<[dto: AlbumsAddAssetsDto]>((authDto, ctx, args) =>
       albumService.addAssetsToAlbums(authDto, ...args),
     );
-    const safeFetch = createSafeFetch({ allowedHosts: this.configRepository.getEnv().network.outboundAllowedHosts });
+    const { outboundAllowedHosts } = this.configRepository.getEnv().network;
     const httpRequest = this.wrap<
       [
         url: string,
@@ -100,6 +102,11 @@ export class WorkflowExecutionService extends BaseService {
         throw new Error('Hostname did not match any listed in methods[].allowedHosts in the plugin manifest');
       }
 
+      const safeFetch = createSafeFetch({
+        allowedHosts: outboundAllowedHosts,
+        maxResponseSize: WORKFLOW_MAX_RESPONSE_SIZE,
+        isUrlAllowed: (url) => isAllowedHost(url.hostname, context.allowedHosts),
+      });
       const res = await safeFetch(...args);
 
       return {
