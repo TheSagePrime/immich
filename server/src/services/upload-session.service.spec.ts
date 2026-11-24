@@ -12,7 +12,11 @@ import {
   UPLOAD_TEMP_DIR_NAME,
 } from 'src/constants.js';
 import { UploadSession } from 'src/dtos/upload-session.dto.js';
-import { JobName, JobStatus, UploadDuplicatePolicy, UploadOutcome, UploadSessionStatus } from 'src/enum.js';
+import {
+  AssetStatus,
+  JobName,
+  JobStatus,
+  UploadDuplicatePolicy, UploadOutcome, UploadSessionStatus } from 'src/enum.js';
 import { UploadSessionService } from 'src/services/upload-session.service.js';
 import { factory, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
@@ -538,6 +542,50 @@ describe(UploadSessionService.name, () => {
         data: { id: 'offline-asset', source: 'upload' },
       });
       expect(result.result?.assetId).toBe('offline-asset');
+    });
+
+    it('should keep an offline asset the user trashed in the trash', async () => {
+      const { session } = setupComplete();
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue({
+        id: 'trashed-asset',
+        isOffline: true,
+        status: AssetStatus.Trashed,
+        deletedAt: new Date(),
+      } as never);
+
+      await sut.complete(auth, session.id);
+
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['trashed-asset'], {
+        isOffline: false,
+        fileModifiedAt: expect.any(Date),
+      });
+    });
+
+    it('should not restore an online asset the user trashed', async () => {
+      const { session } = setupComplete();
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue({
+        id: 'trashed-asset',
+        isOffline: false,
+        status: AssetStatus.Trashed,
+        deletedAt: new Date(),
+      } as never);
+
+      await sut.complete(auth, session.id);
+
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['trashed-asset'], { fileModifiedAt: expect.any(Date) });
+    });
+
+    it('should mark the session failed when the partial file is gone', async () => {
+      const { session } = setupComplete();
+      existing.delete(session.tempPath!);
+
+      await expect(sut.complete(auth, session.id)).rejects.toMatchObject({ status: 410 });
+
+      expect(mocks.uploadSession.update).toHaveBeenCalledWith(session.id, {
+        status: UploadSessionStatus.Failed,
+        outcome: UploadOutcome.Failed,
+        message: 'partial_gone',
+      });
     });
 
     it('should reuse the asset when the library watcher imported it first', async () => {

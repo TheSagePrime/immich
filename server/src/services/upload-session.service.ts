@@ -43,6 +43,7 @@ import {
   mapUploadSession,
 } from 'src/dtos/upload-session.dto.js';
 import {
+  AssetStatus,
   DatabaseLock,
   ImmichWorker,
   JobName,
@@ -96,6 +97,7 @@ const UPLOAD_CHECK_CONCURRENCY = 16;
 const NO_HARD_LINK_ERRORS = ['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EMLINK'];
 const MESSAGE_EXISTS = 'exists';
 const MESSAGE_CHECKSUM_MISMATCH = 'checksum_mismatch';
+const MESSAGE_PARTIAL_GONE = 'partial_gone';
 
 const terminalStatuses = new Set([
   UploadSessionStatus.Completed,
@@ -342,7 +344,19 @@ export class UploadSessionService extends BaseService {
 
     const tempPath = session.tempPath as string;
     const size = Number(session.size);
-    const storedSize = await this.getTempSize(session);
+    let storedSize: number;
+    try {
+      storedSize = await this.getTempSize(session);
+    } catch (error) {
+      await this.uploadSessionRepository.update(session.id, {
+        status: UploadSessionStatus.Failed,
+        outcome: UploadOutcome.Failed,
+        message: MESSAGE_PARTIAL_GONE,
+      });
+      this.hashes.delete(session.id);
+      throw error;
+    }
+
     if (storedSize !== size) {
       await this.uploadSessionRepository.update(session.id, { status: UploadSessionStatus.Active });
       throw new ConflictException({ message: 'Upload is incomplete', offset: storedSize });
@@ -700,13 +714,12 @@ export class UploadSessionService extends BaseService {
     const stat = await this.storageRepository.stat(target.realPath);
 
     if (existing) {
-      if (existing.isOffline || existing.deletedAt) {
-        await this.assetRepository.updateAll([existing.id], {
-          isOffline: false,
-          deletedAt: null,
-          fileModifiedAt: stat.mtime,
-        });
-      }
+      const isTrashed = existing.status === AssetStatus.Trashed;
+      await this.assetRepository.updateAll([existing.id], {
+        fileModifiedAt: stat.mtime,
+        ...(existing.isOffline && { isOffline: false }),
+        ...(existing.isOffline && !isTrashed && { deletedAt: null }),
+      });
       await this.jobRepository.queue({ name: JobName.SidecarCheck, data: { id: existing.id, source: 'upload' } });
       return existing.id;
     }

@@ -5,6 +5,7 @@ import {
   getChunkRange,
   getConflictOffset,
   getErrorMessage,
+  getErrorStatus,
   getResumeKey,
   getRetryDelay,
   hashFileInWorker,
@@ -96,6 +97,8 @@ const outcomeStates: Record<UploadOutcome, FolderUploadState> = {
   [UploadOutcome.Skipped]: FolderUploadState.Skipped,
   [UploadOutcome.Failed]: FolderUploadState.Failed,
 };
+
+const resumableStatuses = new Set<UploadSessionStatus>([UploadSessionStatus.Completing, UploadSessionStatus.Completed]);
 
 const SPEED_WINDOW_MS = 5000;
 const MAX_COMPLETE_ATTEMPTS = 3;
@@ -401,18 +404,35 @@ export class FolderUploadManager {
     this.controllers.set(key, controller);
     try {
       let session = await this.openSession(item, controller.signal);
+      if (session.status === UploadSessionStatus.Completing) {
+        session = await this.waitForCompletion(session.id, controller.signal);
+      }
+
       for (let attempt = 0; session.status === UploadSessionStatus.Active; attempt++) {
         await this.sendChunks(key, item.file, session, controller.signal);
         this.setState(key, { state: FolderUploadState.Completing });
         try {
           session = await this.deps.completeSession({ id: session.id });
         } catch (error) {
-          const offset = getConflictOffset(error);
-          if (offset === undefined || attempt >= MAX_COMPLETE_ATTEMPTS) {
+          if (attempt >= MAX_COMPLETE_ATTEMPTS) {
             throw error;
           }
-          this.setState(key, { state: FolderUploadState.Uploading });
-          session = { ...session, offset };
+
+          const offset = getConflictOffset(error);
+          if (offset !== undefined) {
+            this.setState(key, { state: FolderUploadState.Uploading });
+            session = { ...session, offset };
+            continue;
+          }
+
+          if (!isRetryableError(error) && getErrorStatus(error) !== 409) {
+            throw error;
+          }
+
+          session = await this.waitForCompletion(session.id, controller.signal, error);
+          if (session.status === UploadSessionStatus.Active) {
+            this.setState(key, { state: FolderUploadState.Uploading });
+          }
         }
       }
 
@@ -437,6 +457,10 @@ export class FolderUploadManager {
       const session = await this.deps.getSession({ id: resume.sessionId }).catch(() => undefined);
       if (session && session.status === UploadSessionStatus.Active) {
         this.setState(item.key, { state: FolderUploadState.Uploading, sessionId: session.id });
+        return session;
+      }
+      if (session && resumableStatuses.has(session.status)) {
+        this.setState(item.key, { state: FolderUploadState.Completing, sessionId: session.id });
         return session;
       }
       resumeStore.remove(item.key);
@@ -497,7 +521,7 @@ export class FolderUploadManager {
           continue;
         }
 
-        if (!isRetryableError(error) || attempt >= MAX_RETRY_ATTEMPTS) {
+        if ((!isRetryableError(error) && getErrorStatus(error) !== 409) || attempt >= MAX_RETRY_ATTEMPTS) {
           throw error;
         }
 
@@ -513,6 +537,18 @@ export class FolderUploadManager {
         }
       }
     }
+  }
+
+  private async waitForCompletion(id: string, signal: AbortSignal, cause?: unknown) {
+    for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+      await this.deps.wait(getRetryDelay(attempt), signal);
+      const session = await this.deps.getSession({ id }).catch(() => undefined);
+      if (session && session.status !== UploadSessionStatus.Completing) {
+        return session;
+      }
+    }
+
+    throw cause ?? new Error(`Upload session ${id} is still completing`);
   }
 
   private finish(key: string, session: UploadSessionResponseDto) {

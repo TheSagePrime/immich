@@ -216,4 +216,23 @@ test.describe('folder upload', () => {
     const viewport = page.viewportSize()!;
     expect(box).toMatchObject({ x: 0, y: 0, width: viewport.width, height: viewport.height });
   });
+
+  test('keeps the album upload when dragging over an album', async ({ page, data }) => {
+    data.addLibraries(factory.library({ writable: true }));
+    const album = factory.album({ albumName: 'Holiday' });
+    data.addAlbums(album);
+    await page.goto(Route.viewAlbum(album));
+    await expect(page).toHaveTitle(/Holiday/);
+
+    await page.evaluate(() => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(new File(['x'], 'a.jpg'));
+      document.body.dispatchEvent(new DragEvent('dragenter', { dataTransfer, bubbles: true }));
+    });
+
+    const overlay = page.getByTestId('drop-overlay');
+    await expect(overlay).toBeVisible();
+    await expect(overlay).toContainText('drop_files_to_upload');
+    await expect(overlay).not.toContainText('drop_files_or_folders_to_upload');
+  });
 });
