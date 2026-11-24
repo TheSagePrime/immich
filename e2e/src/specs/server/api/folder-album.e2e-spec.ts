@@ -7,6 +7,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const root = `${testAssetDir}/temp/folder-albums`;
 const rootInternal = `${testAssetDirInternal}/temp/folder-albums`;
 
+const folderAlbumIds = (list: AlbumResponseDto[]) =>
+  list
+    .filter(({ isFolderAlbum }) => isFolderAlbum)
+    .map(({ id }) => id)
+    .toSorted((a, b) => a.localeCompare(b));
+
 describe('folder albums', () => {
   let admin: LoginResponseDto;
   let user: LoginResponseDto;
@@ -79,8 +85,8 @@ describe('folder albums', () => {
         .set(asBearerAuth(admin.accessToken));
 
       expect(status).toBe(200);
-      expect((body as AlbumResponseDto[]).map(({ id }) => id).toSorted()).toEqual(
-        [manual.id, byName('folder-albums').id].toSorted(),
+      expect((body as AlbumResponseDto[]).map(({ id }) => id).toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [manual.id, byName('folder-albums').id].toSorted((a, b) => a.localeCompare(b)),
       );
     });
 
@@ -116,7 +122,8 @@ describe('folder albums', () => {
         ],
       });
       expect(body.children).toHaveLength(1);
-      expect(body.children[0]).toMatchObject({ id: byName('day 1').id, assetCount: 2, isFolderAlbum: true });
+      const [child] = body.children;
+      expect(child).toMatchObject({ id: byName('day 1').id, assetCount: 2, isFolderAlbum: true });
     });
 
     it('should return nothing for a hand-made album', async () => {
@@ -204,16 +211,11 @@ describe('folder albums', () => {
         .send({ albumUsers: [{ userId: user.userId, role: 'viewer' }] });
       expect(status).toBe(200);
 
-      const { body } = await request(app)
-        .get('/albums')
-        .query({ topLevel: true })
-        .set(asBearerAuth(user.accessToken));
+      const { body } = await request(app).get('/albums').query({ topLevel: true }).set(asBearerAuth(user.accessToken));
       expect((body as AlbumResponseDto[]).map(({ id }) => id)).toEqual([trip.id]);
       expect(body[0]).toMatchObject({ isFolderAlbum: true, childAlbumCount: 0 });
 
-      const { body: folder } = await request(app)
-        .get(`/albums/${trip.id}/folder`)
-        .set(asBearerAuth(user.accessToken));
+      const { body: folder } = await request(app).get(`/albums/${trip.id}/folder`).set(asBearerAuth(user.accessToken));
       expect(folder).toEqual({ isFolderAlbum: true, ancestors: [], children: [] });
     });
   });
@@ -224,12 +226,7 @@ describe('folder albums', () => {
       await utils.waitForQueueFinish(admin.accessToken, 'backgroundTask');
 
       const { body } = await request(app).get('/albums').set(asBearerAuth(admin.accessToken));
-      const ids = (list: AlbumResponseDto[]) =>
-        list
-          .filter(({ isFolderAlbum }) => isFolderAlbum)
-          .map(({ id }) => id)
-          .toSorted();
-      expect(ids(body)).toEqual(ids(albums));
+      expect(folderAlbumIds(body)).toEqual(folderAlbumIds(albums));
     });
   });
 });
