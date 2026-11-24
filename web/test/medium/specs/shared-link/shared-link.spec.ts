@@ -159,4 +159,22 @@ test.describe('shared link', () => {
       body: expect.objectContaining({ type: SharedLinkType.Individual, assetIds: [asset.id] }),
     });
   });
+
+  test('a default expiration of 0 preselects never', async ({ page, data, api, app }) => {
+    data.userConfig.sharedLink.defaultExpiryDays = 0;
+    const asset = factory.asset();
+    data.addAssets(asset);
+    await page.goto(Route.viewAsset({ id: asset.id }));
+    await app.viewer.waitForAsset(asset);
+
+    await app.viewer.shareButton.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('button', { name: 'never', exact: true })).not.toHaveClass(/border-primary/);
+    await expect(dialog.getByRole('button', { name: 'in 30 days', exact: true })).toHaveClass(/border-primary/);
+    await app.sharedLink.form.createButton.click();
+
+    await expect.poll(() => api.createSharedLink.calls.length).toBe(1);
+    const [{ body }] = api.createSharedLink.calls;
+    expect(body.expiresAt ?? null).toBeNull();
+  });
 });

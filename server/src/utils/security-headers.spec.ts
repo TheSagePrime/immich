@@ -105,6 +105,16 @@ describe('createSecurityHeadersMiddleware', () => {
     expect(API_CONTENT_SECURITY_POLICY).toContain(`default-src 'none'`);
   });
 
+  it('should sandbox api responses regardless of the path case', () => {
+    const middleware = createSecurityHeadersMiddleware({ manifest, webPolicy: true });
+    for (const path of ['/API/assets/123/original', '/Api/assets/123/thumbnail', '/aPi']) {
+      expect(run(middleware, path)['content-security-policy']).toBe(API_CONTENT_SECURITY_POLICY);
+    }
+    expect(run(middleware, '/DOC')['content-security-policy']).toBe(
+      `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`,
+    );
+  });
+
   it('should sandbox api responses even when the web policy is off', () => {
     const middleware = createSecurityHeadersMiddleware({ webPolicy: false });
     expect(run(middleware, '/api/assets/123/original')['content-security-policy']).toBe(API_CONTENT_SECURITY_POLICY);

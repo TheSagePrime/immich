@@ -77,6 +77,6 @@
     bind:allowUpload
     bind:showMetadata
     bind:expiresAt
-    defaultExpiryDays={defaultExpiryDays > 0 ? defaultExpiryDays : undefined}
+    {defaultExpiryDays}
   />
 </FormModal>

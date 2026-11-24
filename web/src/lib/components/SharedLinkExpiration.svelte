@@ -28,8 +28,12 @@
     })),
   ]);
 
-  const getInitialPreset = () =>
-    defaultExpiryDays ? Duration.fromObject({ days: defaultExpiryDays }).toMillis() : null;
+  const getInitialPreset = () => {
+    if (defaultExpiryDays === undefined) {
+      return null;
+    }
+    return defaultExpiryDays > 0 ? Duration.fromObject({ days: defaultExpiryDays }).toMillis() : 0;
+  };
 
   let selectedPresetValue = $state<number | null>(getInitialPreset());
 

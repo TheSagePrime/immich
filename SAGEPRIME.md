@@ -401,5 +401,7 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
     `tiles.immich.cloud` unless you change them).
   - **License activation:** only when an admin enters a license key (browser to `pay.futo.org`).
   - **Google Cast:** only when a user turns casting on; blocked by the strict policy (see above).
+  - **Workflow plugins:** only when an installed workflow plugin makes HTTP requests; the server only allows the
+    hosts listed in that plugin's manifest (`allowedHosts`). No plugin makes requests by default.
   - **Reverse geocoding** needs no network at runtime: the GeoNames data is downloaded when the image is built.
   - **Mobile app:** the official app talks to the Immich server, and to the map tile host as described above.

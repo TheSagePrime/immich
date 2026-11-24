@@ -87,6 +87,16 @@ describe('security headers', () => {
     }
   });
 
+  it('should sandbox api responses requested with a different path case', async () => {
+    const asset = await utils.createAsset(admin.accessToken);
+    const { status, headers } = await request(baseUrl)
+      .get(`/API/assets/${asset.id}/original`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(status).toBe(200);
+    expect(directive(headers['content-security-policy'], 'sandbox')).toEqual([]);
+    expect(directive(headers['content-security-policy'], 'default-src')).toEqual([`'none'`]);
+  });
+
   it('should disable third-party features by default', async () => {
     const config = await getConfig({ headers: asBearerAuth(admin.accessToken) });
     expect(config.map.enabled).toBe(false);

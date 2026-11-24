@@ -66,7 +66,7 @@ export const createSecurityHeadersMiddleware = ({ manifest, webPolicy, getMapSou
   return (request: Request, response: Response, next: NextFunction) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
 
-    const path = request.path;
+    const path = request.path.toLowerCase();
     if (path === '/api' || path.startsWith('/api/')) {
       response.setHeader('Content-Security-Policy', API_CONTENT_SECURITY_POLICY);
     } else if (path === '/doc' || path.startsWith('/doc/') || path.startsWith('/doc-')) {
