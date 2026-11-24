@@ -10,6 +10,7 @@ import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { PluginRepository } from 'src/repositories/plugin.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
@@ -42,7 +43,7 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
         UserRepository,
         WorkflowRepository,
       ],
-      mock: [ConfigRepository, EventRepository, WebsocketRepository],
+      mock: [ConfigRepository, EventRepository, JobRepository, WebsocketRepository],
     });
   }
 
@@ -56,6 +57,7 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
     mockData.plugins.external.allow = false;
     this.getMock(ConfigRepository).getEnv.mockReturnValue(mockData);
     this.getMock(EventRepository).emit.mockResolvedValue();
+    this.getMock(JobRepository).queueAll.mockResolvedValue();
     this.getMock(WebsocketRepository).clientSend.mockReturnValue();
     this.get(LoggingRepository).setLogLevel(LogLevel.Verbose);
 
