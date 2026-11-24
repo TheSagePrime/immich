@@ -168,6 +168,7 @@ from
   ) as "membership" on true
 where
   "asset"."deletedAt" is null
+  and "asset"."visibility" != 'locked'
   and (
     "asset"."id" = any ("target"."ids")
     or "asset"."livePhotoVideoId" = any ("target"."ids")

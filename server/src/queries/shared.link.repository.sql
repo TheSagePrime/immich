@@ -54,6 +54,7 @@ select
         where
           "shared_link"."id" = "shared_link_asset"."sharedLinkId"
           and "asset"."deletedAt" is null
+          and "asset"."visibility" != 'locked'
         order by
           "asset"."fileCreatedAt" asc
       ) as agg
