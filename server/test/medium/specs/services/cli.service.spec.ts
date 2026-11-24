@@ -1,10 +1,13 @@
 import { Kysely, sql } from 'kysely';
 import { OFFICIAL_BASELINE_MIGRATION } from 'src/constants.js';
+import { AssetOrder } from 'src/enum.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { FolderAlbumRepository } from 'src/repositories/folder-album.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { DB } from 'src/schema/index.js';
 import { CliService } from 'src/services/cli.service.js';
 import { newMediumService } from 'test/medium.factory.js';
+import { newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 const setup = (database: Kysely<DB>) =>
@@ -71,6 +74,66 @@ describe(CliService.name, () => {
       expect(await hasUploadSessionTable()).toBe(false);
       await ctx.get(DatabaseRepository).runMigrations();
       expect(await hasUploadSessionTable()).toBe(true);
+
+      await database.destroy();
+    });
+
+    it('should delete folder albums, keep hand-made albums and drop the folder album schema', async () => {
+      const database = await getKyselyDB();
+      const { sut, ctx } = setup(database);
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath: '/data/library/x/folder/a.jpg' });
+      const { album: manual } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Hand made' }, [asset.id]);
+      const folderAlbumId = newUuid();
+      await ctx
+        .get(FolderAlbumRepository)
+        .createFolderAlbums(
+          [{ id: folderAlbumId, folderPath: '/data/library/x/folder', albumName: 'folder', parentAlbumId: null }],
+          user.id,
+          AssetOrder.Desc,
+        );
+      await ctx.get(FolderAlbumRepository).addMembers(user.id);
+      await ctx
+        .get(FolderAlbumRepository)
+        .saveState({ userId: user.id, checkpointAt: new Date(), rootsKey: 'key', fullSyncAt: new Date() });
+
+      const hasColumn = async (column: string) => {
+        const { rows } = await sql<{ exists: boolean }>`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns WHERE table_name = 'album' AND column_name = ${column}
+          ) AS "exists"
+        `.execute(database);
+        return rows[0].exists;
+      };
+      const hasSyncTable = async () => {
+        const { rows } = await sql<{
+          exists: boolean;
+        }>`select to_regclass('public.folder_album_sync') is not null as "exists"`.execute(database);
+        return rows[0].exists;
+      };
+
+      await sut.revertForkMigrations();
+
+      for (const column of ['parentAlbumId', 'folderOwnerId', 'folderPath']) {
+        expect(await hasColumn(column)).toBe(false);
+      }
+      expect(await hasSyncTable()).toBe(false);
+      const { rows: albums } = await sql<{ id: string }>`select "id" from "album"`.execute(database);
+      expect(albums.map(({ id }) => id)).toEqual([manual.id]);
+      const { rows: members } = await sql<{
+        assetId: string;
+      }>`select "assetId" from "album_asset" where "albumId" = ${manual.id}::uuid`.execute(database);
+      expect(members).toEqual([{ assetId: asset.id }]);
+      const { rows: audit } = await sql<{
+        albumId: string;
+      }>`select "albumId" from "album_audit" where "albumId" = ${folderAlbumId}::uuid`.execute(database);
+      expect(audit).toEqual([{ albumId: folderAlbumId }]);
+
+      await ctx.get(DatabaseRepository).runMigrations();
+      for (const column of ['parentAlbumId', 'folderOwnerId', 'folderPath']) {
+        expect(await hasColumn(column)).toBe(true);
+      }
+      expect(await hasSyncTable()).toBe(true);
 
       await database.destroy();
     });

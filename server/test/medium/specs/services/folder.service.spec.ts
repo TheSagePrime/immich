@@ -5,12 +5,13 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { AssetFileType, AssetStatus, ChecksumAlgorithm } from 'src/enum.js';
+import { AssetFileType, AssetOrder, AssetStatus, ChecksumAlgorithm } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FolderAlbumRepository } from 'src/repositories/folder-album.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -20,7 +21,7 @@ import { DB } from 'src/schema/index.js';
 import { FolderService } from 'src/services/folder.service.js';
 import { ViewService } from 'src/services/view.service.js';
 import { newMediumService } from 'test/medium.factory.js';
-import { factory } from 'test/small.factory.js';
+import { factory, newUuid } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
 let defaultDatabase: Kysely<DB>;
@@ -42,6 +43,7 @@ const setup = () => {
     mock: [EventRepository, JobRepository, LoggingRepository],
   });
   ctx.getMock(EventRepository).emit.mockResolvedValue();
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
   const { sut: viewService } = newMediumService(ViewService, {
     database: defaultDatabase,
     real,
@@ -111,6 +113,32 @@ describe(FolderService.name, () => {
 
     return { sut, ctx, viewService, auth, user, library, crypto, newLibraryAsset, getAsset };
   };
+
+  it('should rewrite folder album paths in the same transaction and keep their ids', async () => {
+    const { sut, ctx, auth, user, newLibraryAsset } = await createContext();
+    await newLibraryAsset(join(root, 'trip', 'day', 'photo.jpg'));
+    const folderAlbums = ctx.get(FolderAlbumRepository);
+    await folderAlbums.createFolderAlbums(
+      [
+        { id: newUuid(), folderPath: join(root, 'trip'), albumName: 'trip', parentAlbumId: null },
+        { id: newUuid(), folderPath: join(root, 'trip', 'day'), albumName: 'day', parentAlbumId: null },
+        { id: newUuid(), folderPath: join(root, 'holiday'), albumName: 'holiday', parentAlbumId: null },
+        { id: newUuid(), folderPath: join(root, 'trip2'), albumName: 'trip2', parentAlbumId: null },
+      ],
+      user.id,
+      AssetOrder.Desc,
+    );
+    const before = new Map((await folderAlbums.getFolderAlbums(user.id)).map((album) => [album.folderPath, album.id]));
+
+    await sut.rename(auth, { path: join(root, 'trip'), name: 'holiday' });
+
+    const after = new Map((await folderAlbums.getFolderAlbums(user.id)).map((album) => [album.folderPath, album.id]));
+    expect(after.get(join(root, 'holiday'))).toBe(before.get(join(root, 'trip')));
+    expect(after.get(join(root, 'holiday', 'day'))).toBe(before.get(join(root, 'trip', 'day')));
+    expect(after.get(join(root, 'trip2'))).toBe(before.get(join(root, 'trip2')));
+    expect(after.has(join(root, 'trip'))).toBe(false);
+    expect(after.size).toBe(3);
+  });
 
   it('should rename a folder and rewrite paths, checksums and sidecars, including trashed assets', async () => {
     const { sut, ctx, auth, crypto, newLibraryAsset, getAsset } = await createContext();
