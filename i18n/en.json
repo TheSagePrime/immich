@@ -2387,6 +2387,7 @@
   "upload_folder_add_subfolder": "Add subfolder",
   "upload_folder_destination": "Destination folder",
   "upload_folder_empty": "No sub-folders",
+  "upload_folder_here": "Upload folder here",
   "upload_folder_ignored": "{count, plural, one {# file is} other {# files are}} not supported and will be left out",
   "upload_folder_invalid_name": "Folder names cannot be empty, start with a dot or contain slashes",
   "upload_folder_library": "Library",

@@ -21,10 +21,12 @@
 
   type Props = {
     entries: FolderUploadEntry[];
+    libraryId?: string;
+    destination?: string;
     onClose: (started?: boolean) => void;
   };
 
-  const { entries, onClose }: Props = $props();
+  const { entries, libraryId: initialLibraryId, destination: initialDestination = '', onClose }: Props = $props();
 
   const librariesQuery = createQuery(
     () => getUploadLibrariesQuery(),
@@ -32,9 +34,11 @@
   );
   const libraries = $derived(librariesQuery.data ?? []);
 
-  let selectedLibraryId = $state<string>();
-  const libraryId = $derived(selectedLibraryId ?? libraries[0]?.id);
-  let destination = $state('');
+  let selectedLibraryId = $state<string | undefined>(initialLibraryId);
+  const libraryId = $derived(
+    libraries.some((library) => library.id === selectedLibraryId) ? selectedLibraryId : libraries[0]?.id,
+  );
+  let destination = $state(initialLibraryId ? initialDestination : '');
   let duplicatePolicy = $state(UploadDuplicatePolicy.Skip);
   let existingCount = $state<number>();
   let isChecking = $state(false);

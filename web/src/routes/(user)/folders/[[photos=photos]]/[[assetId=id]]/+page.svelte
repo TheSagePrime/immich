@@ -3,12 +3,10 @@
   import OnEvents from '#lib/components/OnEvents.svelte';
   import FolderBreadcrumbs from '#lib/components/folders/FolderBreadcrumbs.svelte';
   import FolderCards from '#lib/components/folders/FolderCards.svelte';
-  import UserPageLayout, { headerId } from '#lib/components/layouts/UserPageLayout.svelte';
+  import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
-  import TreeItems from '#lib/components/shared-components/tree/TreeItems.svelte';
-  import Sidebar from '#lib/components/sidebar/Sidebar.svelte';
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
@@ -17,16 +15,10 @@
   import DownloadAction from '#lib/components/timeline/actions/DownloadAction.svelte';
   import FavoriteAction from '#lib/components/timeline/actions/FavoriteAction.svelte';
   import SetVisibilityAction from '#lib/components/timeline/actions/SetVisibilityAction.svelte';
-  import SkipLink from '#lib/elements/SkipLink.svelte';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
   import type { Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { createPreloadedQuery, queryClient } from '#lib/queries/client.ts';
-  import {
-    folderViewQueryKey,
-    getAssetsByOriginalPathQuery,
-    getFolderSummaryQuery,
-    getFolderTreeQuery,
-  } from '#lib/queries/view.query.ts';
+  import { folderViewQueryKey, getAssetsByOriginalPathQuery, getFolderSummaryQuery } from '#lib/queries/view.query.ts';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import {
@@ -39,14 +31,13 @@
   import { getFolderCards, type FolderCard } from '#lib/utils/folder-cards.ts';
   import { isAssetViewerRoute } from '#lib/utils/navigation.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
-  import { ActionButton, CommandPaletteDefaultProvider, IconButton, Text } from '@immich/ui';
+  import { ActionButton, CommandPaletteDefaultProvider, IconButton } from '@immich/ui';
   import {
     mdiCheckboxMultipleMarkedOutline,
     mdiClose,
     mdiDotsVertical,
     mdiFolder,
     mdiFolderHome,
-    mdiFolderOutline,
     mdiSelectAll,
   } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -60,8 +51,6 @@
 
   let { data }: Props = $props();
 
-  const query = createPreloadedQuery(getFolderTreeQuery);
-  const root = $derived(query.data);
   const summaryQuery = createPreloadedQuery(() => getFolderSummaryQuery(data.folderPath));
   const summary = $derived(summaryQuery.data);
   const writable = $derived(summary.writable);
@@ -115,9 +104,10 @@
       return [];
     }
 
-    const { CreateFolder } = getFolderActions($t, data.folderPath, handleFolderChange);
+    const { CreateFolder, UploadFolder } = getFolderActions($t, data.folderPath, handleFolderChange, summary.libraryId);
     return [
       CreateFolder,
+      UploadFolder,
       {
         title: selectingFolders ? $t('cancel') : $t('select_folders'),
         icon: selectingFolders ? mdiClose : mdiCheckboxMultipleMarkedOutline,
@@ -185,23 +175,6 @@
     : undefined}
   actions={headerActions}
 >
-  {#snippet sidebar()}
-    <Sidebar>
-      <SkipLink target={`#${headerId}`} text={$t('skip_to_folders')} breakpoint="md" />
-      <section>
-        <Text class="mb-4 ps-4" size="small">{$t('explorer')}</Text>
-        <div class="h-full">
-          <TreeItems
-            icons={{ default: mdiFolderOutline, active: mdiFolder }}
-            tree={root}
-            active={data.tree.path}
-            getLink={getLinkForPath}
-          />
-        </div>
-      </section>
-    </Sidebar>
-  {/snippet}
-
   <OnEvents onAssetsDelete={refreshAll} onAssetsArchive={triggerAssetUpdate} onAssetsUnarchive={triggerAssetUpdate} />
 
   <FolderBreadcrumbs path={data.folderPath} icon={mdiFolderHome} title={$t('folders')} getLink={getLinkForPath} />
