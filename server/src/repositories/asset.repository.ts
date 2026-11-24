@@ -54,6 +54,7 @@ import {
   withTagId,
   withTags,
 } from 'src/utils/database.js';
+import { toFolderLikePattern } from 'src/utils/folder-filter.js';
 
 export type AssetStats = Record<AssetType, number>;
 
@@ -93,6 +94,7 @@ interface AssetBuilderOptions {
   visibility?: AssetVisibility;
   withCoordinates?: boolean;
   bbox?: BoundingBox;
+  folder?: string;
 }
 
 export interface TimeBucketOptions extends AssetBuilderOptions {
@@ -796,6 +798,7 @@ export class AssetRepository {
           )
           .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
           .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
+          .$if(!!options.folder, (qb) => qb.where('asset.originalPath', 'like', toFolderLikePattern(options.folder!)))
           .$if(options.isDuplicate !== undefined, (qb) =>
             qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
           )
@@ -919,6 +922,7 @@ export class AssetRepository {
               .select('stack'),
           )
           .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
+          .$if(!!options.folder, (qb) => qb.where('asset.originalPath', 'like', toFolderLikePattern(options.folder!)))
           .$if(options.isDuplicate !== undefined, (qb) =>
             qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
           )

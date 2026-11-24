@@ -52,6 +52,7 @@ import { UploadSessionService } from 'src/services/upload-session.service.js';
 import { UserAdminService } from 'src/services/user-admin.service.js';
 import { UserService } from 'src/services/user.service.js';
 import { VersionService } from 'src/services/version.service.js';
+import { VideoLibraryService } from 'src/services/video-library.service.js';
 import { ViewService } from 'src/services/view.service.js';
 import { WorkflowExecutionService } from 'src/services/workflow-execution.service.js';
 import { WorkflowService } from 'src/services/workflow.service.js';
@@ -111,6 +112,7 @@ export const services = [
   UserAdminService,
   UserService,
   VersionService,
+  VideoLibraryService,
   ViewService,
   WorkflowExecutionService,
   WorkflowService,

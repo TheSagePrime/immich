@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 import { BBoxSchema } from 'src/dtos/bbox.dto.js';
-import { AssetOrderBySchema, AssetOrderSchema, AssetVisibilitySchema } from 'src/enum.js';
+import { AssetOrderBySchema, AssetOrderSchema, AssetTypeSchema, AssetVisibilitySchema } from 'src/enum.js';
 import { stringToBool } from 'src/validation.js';
 
 const TimeBucketQueryBaseSchema = z
@@ -30,6 +30,14 @@ const TimeBucketQueryBaseSchema = z
       'Filter by asset visibility status (ARCHIVE, TIMELINE, HIDDEN, LOCKED)',
     ),
     withCoordinates: stringToBool.optional().describe('Include location data in the response'),
+    type: AssetTypeSchema.optional().describe('Filter by asset type (for example VIDEO for videos only)'),
+    folder: z
+      .string()
+      .min(1)
+      .max(4096)
+      .refine((value) => !value.includes('\0'), 'folder must not contain NUL bytes')
+      .optional()
+      .describe('Only include assets whose original file is inside this folder or one of its subfolders'),
     key: z.string().optional(),
     slug: z.string().optional(),
     bbox: z

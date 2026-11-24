@@ -44,6 +44,7 @@ import { TrashController } from 'src/controllers/trash.controller.js';
 import { UploadSessionController } from 'src/controllers/upload-session.controller.js';
 import { UserAdminController } from 'src/controllers/user-admin.controller.js';
 import { UserController } from 'src/controllers/user.controller.js';
+import { VideoLibraryController } from 'src/controllers/video-library.controller.js';
 import { VideoStreamController } from 'src/controllers/video-stream.controller.js';
 import { ViewController } from 'src/controllers/view.controller.js';
 import { WorkflowController } from 'src/controllers/workflow.controller.js';
@@ -95,6 +96,7 @@ export const controllers = [
   UploadSessionController,
   UserAdminController,
   UserController,
+  VideoLibraryController,
   VideoStreamController,
   ViewController,
   WorkflowController,

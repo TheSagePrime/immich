@@ -26,7 +26,7 @@ export class TimelineService extends BaseService {
   }
 
   private async buildTimeBucketOptions(auth: AuthDto, dto: TimeBucketDto): Promise<TimeBucketOptions> {
-    const { userId, ...options } = dto;
+    const { userId, type, ...options } = dto;
     let userIds: string[] | undefined;
 
     if (userId) {
@@ -41,7 +41,7 @@ export class TimelineService extends BaseService {
       }
     }
 
-    return { ...options, userIds };
+    return { ...options, userIds, ...(type && { assetType: type }) };
   }
 
   private async timeBucketChecks(auth: AuthDto, dto: TimeBucketDto) {
@@ -71,6 +71,10 @@ export class TimelineService extends BaseService {
 
     if (dto.tagId) {
       await this.requireAccess({ auth, permission: Permission.TagRead, ids: [dto.tagId] });
+    }
+
+    if (dto.folder && auth.sharedLink) {
+      throw new BadRequestException('Folder filter is not available for shared links');
     }
 
     if (isMetadataHidden(auth)) {

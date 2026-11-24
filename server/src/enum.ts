@@ -1349,6 +1349,7 @@ export enum ApiTag {
   UploadSessions = 'Upload sessions',
   Views = 'Views',
   Workflows = 'Workflows',
+  VideoLibrary = 'Video library',
 }
 
 export const WorkflowTriggerSchema = z
