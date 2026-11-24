@@ -3,9 +3,11 @@ import { DateTime } from 'luxon';
 import { SALT_ROUNDS } from 'src/constants.js';
 import { UserAdmin } from 'src/database.js';
 import { AuthDto, SignUpDto } from 'src/dtos/auth.dto.js';
+import { defaults } from 'src/dtos/config.dto.js';
 import { AuthType, Permission } from 'src/enum.js';
 import { AuthService } from 'src/services/auth.service.js';
 import type { UserMetadataItem } from 'src/types.js';
+import { TooManyRequestsException } from 'src/utils/rate-limit.js';
 import { ApiKeyFactory } from 'test/factories/api-key.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { OAuthProfileFactory } from 'test/factories/oauth-profile.factory.js';
@@ -18,6 +20,8 @@ import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const email = 'test@immich.com';
+const defaultsRateLimit = defaults.passwordLogin.rateLimit;
+const decode = (key: string) => Buffer.from(key, 'hex').toString();
 const loginDetails = {
   isSecure: true,
   clientIp: '127.0.0.1',
@@ -87,6 +91,135 @@ describe(AuthService.name, () => {
       });
 
       expect(mocks.user.getByEmail).toHaveBeenCalledTimes(1);
+    });
+
+    describe('rate limiting', () => {
+      it('should reject a locked account before checking the password', async () => {
+        const lockedUntil = new Date(Date.now() + 90_000);
+        mocks.loginAttempt.getLocked.mockResolvedValue([{ key: 'key', failures: 5, lockedUntil }]);
+
+        const error = await sut.login(dto, loginDetails).catch((error) => error);
+
+        expect(error).toBeInstanceOf(TooManyRequestsException);
+        expect(error.getStatus()).toBe(429);
+        expect(error.retryAfterSeconds).toBeGreaterThanOrEqual(89);
+        expect(error.retryAfterSeconds).toBeLessThanOrEqual(90);
+        expect(mocks.user.getByEmail).not.toHaveBeenCalled();
+        expect(mocks.crypto.compareBcrypt).not.toHaveBeenCalled();
+        expect(mocks.loginAttempt.recordFailure).not.toHaveBeenCalled();
+      });
+
+      it('should look up the email and the client ip', async () => {
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+
+        await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
+
+        const [keys] = mocks.loginAttempt.getLocked.mock.calls[0];
+        expect(keys.map((key) => decode(key))).toEqual([`email:${email} (hashed)`, 'ip:127.0.0.1 (hashed)']);
+      });
+
+      it('should count failures for unknown emails the same way as for existing accounts', async () => {
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+
+        await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(mocks.loginAttempt.recordFailure).toHaveBeenCalledTimes(2);
+        expect(decode(mocks.loginAttempt.recordFailure.mock.calls[0][0])).toBe(`email:${email} (hashed)`);
+        expect(mocks.loginAttempt.lock).not.toHaveBeenCalled();
+      });
+
+      it('should count a wrong password', async () => {
+        mocks.user.getByEmail.mockResolvedValue(UserFactory.create({ password: 'immich_password' }));
+        mocks.crypto.compareBcrypt.mockReturnValue(false);
+
+        await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(mocks.loginAttempt.recordFailure).toHaveBeenCalledTimes(2);
+        const [, now, resetBefore] = mocks.loginAttempt.recordFailure.mock.calls[0];
+        expect(now.getTime() - resetBefore.getTime()).toBe(15 * 60 * 1000);
+      });
+
+      it('should lock the account when the limit is reached and answer 429', async () => {
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+        mocks.loginAttempt.recordFailure.mockResolvedValueOnce(5).mockResolvedValueOnce(5);
+
+        const error = await sut.login(dto, loginDetails).catch((error) => error);
+
+        expect(error).toBeInstanceOf(TooManyRequestsException);
+        expect(error.retryAfterSeconds).toBe(60);
+        expect(mocks.loginAttempt.lock).toHaveBeenCalledTimes(1);
+        const [key, until] = mocks.loginAttempt.lock.mock.calls[0];
+        expect(decode(key)).toBe(`email:${email} (hashed)`);
+        expect(until.getTime() - Date.now()).toBeLessThanOrEqual(60_000);
+      });
+
+      it('should double the lockout for every further failure up to the maximum', async () => {
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+        mocks.loginAttempt.recordFailure.mockResolvedValueOnce(8).mockResolvedValueOnce(8);
+
+        const error = await sut.login(dto, loginDetails).catch((error) => error);
+        expect(error.retryAfterSeconds).toBe(8 * 60);
+
+        mocks.loginAttempt.recordFailure.mockResolvedValueOnce(20).mockResolvedValueOnce(20);
+        const capped = await sut.login(dto, loginDetails).catch((error) => error);
+        expect(capped.retryAfterSeconds).toBe(60 * 60);
+      });
+
+      it('should lock the ip address after its own limit', async () => {
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+        mocks.loginAttempt.recordFailure.mockResolvedValueOnce(1).mockResolvedValueOnce(30);
+
+        const error = await sut.login(dto, loginDetails).catch((error) => error);
+
+        expect(error).toBeInstanceOf(TooManyRequestsException);
+        expect(mocks.loginAttempt.lock).toHaveBeenCalledTimes(1);
+        expect(decode(mocks.loginAttempt.lock.mock.calls[0][0])).toBe('ip:127.0.0.1 (hashed)');
+      });
+
+      it('should reset the account counter, but not the ip counter, after a successful login', async () => {
+        mocks.user.getByEmail.mockResolvedValue(UserFactory.create({ password: 'immich_password' }));
+        mocks.session.create.mockResolvedValue(SessionFactory.create());
+
+        await expect(sut.login(dto, loginDetails)).resolves.toBeDefined();
+
+        expect(mocks.loginAttempt.reset).toHaveBeenCalledTimes(1);
+        expect(decode(mocks.loginAttempt.reset.mock.calls[0][0])).toBe(`email:${email} (hashed)`);
+        expect(mocks.loginAttempt.recordFailure).not.toHaveBeenCalled();
+      });
+
+      it('should group IPv6 clients by /64 and unwrap IPv4-mapped addresses', async () => {
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+
+        await expect(sut.login(dto, { ...loginDetails, clientIp: '2001:db8:1:2:3:4:5:6' })).rejects.toThrow();
+        await expect(sut.login(dto, { ...loginDetails, clientIp: '::ffff:192.0.2.1' })).rejects.toThrow();
+
+        const ipKeys = mocks.loginAttempt.getLocked.mock.calls.map(([keys]) => decode(keys[1]));
+        expect(ipKeys).toEqual(['ip:2001:db8:1:2::/64 (hashed)', 'ip:192.0.2.1 (hashed)']);
+      });
+
+      it('should skip the ip limit when it is set to 0', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          passwordLogin: { enabled: true, rateLimit: { ...defaultsRateLimit, ipMaxFailures: 0 } },
+        });
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+
+        await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(mocks.loginAttempt.getLocked.mock.calls[0][0]).toHaveLength(1);
+        expect(mocks.loginAttempt.recordFailure).toHaveBeenCalledTimes(1);
+      });
+
+      it('should do nothing when rate limiting is disabled', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          passwordLogin: { enabled: true, rateLimit: { ...defaultsRateLimit, enabled: false } },
+        });
+        mocks.user.getByEmail.mockResolvedValue(void 0);
+
+        await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(mocks.loginAttempt.getLocked).not.toHaveBeenCalled();
+        expect(mocks.loginAttempt.recordFailure).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -475,6 +608,61 @@ describe(AuthService.name, () => {
       ).resolves.toEqual({ user, sharedLink });
 
       expect(mocks.sharedLink.getByKey).toHaveBeenCalledWith(buffer);
+    });
+
+    describe('password protected', () => {
+      const user = UserFactory.create();
+      const sharedLink = { ...sharedLinkStub.valid, password: 'secret', user } as any;
+      const key = sharedLink.key.toString('base64url');
+      const token = Buffer.from(`${sharedLink.id}-secret (hashed)`).toString('base64');
+
+      beforeEach(() => {
+        mocks.sharedLink.getByKey.mockResolvedValue(sharedLink);
+      });
+
+      it('should require the password cookie', async () => {
+        await expect(
+          sut.authenticate({
+            headers: { 'x-immich-share-key': key },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          }),
+        ).rejects.toThrow('Password required');
+      });
+
+      it('should reject a cookie for another password', async () => {
+        const other = Buffer.from(`${sharedLink.id}-other (hashed)`).toString('base64');
+        await expect(
+          sut.authenticate({
+            headers: { 'x-immich-share-key': key, cookie: `immich_shared_link_token=${encodeURIComponent(other)}` },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          }),
+        ).rejects.toThrow('Password required');
+      });
+
+      it('should accept the password cookie', async () => {
+        await expect(
+          sut.authenticate({
+            headers: {
+              'x-immich-share-key': key,
+              cookie: `immich_shared_link_token=${encodeURIComponent(`other,${token}`)}`,
+            },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          }),
+        ).resolves.toEqual({ user, sharedLink });
+      });
+
+      it('should allow routes that do not need the password', async () => {
+        await expect(
+          sut.authenticate({
+            headers: { 'x-immich-share-key': key },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, sharedLinkPasswordRequired: false, uri: 'test' },
+          }),
+        ).resolves.toEqual({ user, sharedLink });
+      });
     });
   });
 

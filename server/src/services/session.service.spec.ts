@@ -20,7 +20,20 @@ describe('SessionService', () => {
   describe('handleCleanup', () => {
     it('should clean sessions', async () => {
       mocks.session.cleanup.mockResolvedValue([]);
+      mocks.loginAttempt.cleanup.mockResolvedValue(0);
       await expect(sut.handleCleanup()).resolves.toEqual(JobStatus.Success);
+    });
+
+    it('should clean failed login records older than the rate limit window', async () => {
+      mocks.session.cleanup.mockResolvedValue([]);
+      mocks.loginAttempt.cleanup.mockResolvedValue(3);
+
+      const before = Date.now();
+      await expect(sut.handleCleanup()).resolves.toEqual(JobStatus.Success);
+
+      const olderThan = mocks.loginAttempt.cleanup.mock.calls[0][0];
+      expect(before - olderThan.getTime()).toBeGreaterThanOrEqual(15 * 60 * 1000 - 1000);
+      expect(before - olderThan.getTime()).toBeLessThanOrEqual(15 * 60 * 1000 + 1000);
     });
   });
 

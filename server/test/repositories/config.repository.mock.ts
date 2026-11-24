@@ -49,6 +49,7 @@ export const envData: EnvData = {
 
   network: {
     trustedProxies: [],
+    outboundAllowedHosts: [],
   },
 
   security: {

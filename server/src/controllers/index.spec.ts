@@ -65,6 +65,35 @@ const SHARED_LINK_ROUTES = new Set([
   'POST shared-links/login',
 ]);
 
+/** Routes that anyone can reach without a session, API key or shared link, i.e. `@Authenticated({ public: true })` */
+const PUBLIC_ROUTES = new Set([
+  'GET .well-known/immich',
+  'GET .well-known/webauthn',
+  'GET admin/maintenance/status',
+  'GET custom.css',
+  'GET oauth/mobile-redirect',
+  'GET public/config',
+  'GET public/config/defaults',
+  'GET server/config',
+  'GET server/features',
+  'GET server/media-types',
+  'GET server/ping',
+  'GET server/version',
+  'GET server/version-history',
+  'POST admin/database-backups/start-restore',
+  'POST admin/maintenance/login',
+  'POST auth/admin-sign-up',
+  'POST auth/login',
+  'POST oauth/authorize',
+  'POST oauth/backchannel-logout',
+  'POST oauth/callback',
+  'POST passkeys/authentication/finish',
+  'POST passkeys/authentication/start',
+]);
+
+const isMediaRoute = (path: string) =>
+  /(thumbnail|original|playback|video|download|profile-image|\.m3u8|:filename)/.test(path);
+
 const isAdminPermission = (permission: AuthenticatedOptions['permission']) =>
   typeof permission === 'string' && permission.startsWith('admin');
 
@@ -114,10 +143,32 @@ describe('controllers', () => {
     expect(undeclared).toEqual([]);
   });
 
+  it('should only allow unauthenticated access to expected routes', () => {
+    const publicRoutes = routes.filter((route) => route.auth?.public).map((route) => route.id);
+
+    expect(new Set(publicRoutes)).toEqual(PUBLIC_ROUTES);
+  });
+
+  it('should require authentication or a shared link for every media route', () => {
+    const mediaRoutes = routes.filter((route) => isMediaRoute(route.path));
+    const unprotected = mediaRoutes.filter((route) => !route.auth || route.auth.public).map((route) => route.label);
+
+    expect(mediaRoutes.length).toBeGreaterThan(10);
+    expect(unprotected).toEqual([]);
+  });
+
   it('should only allow shared link access to expected routes', () => {
     const sharedLinkRoutes = routes.filter((route) => route.auth?.sharedLink).map((route) => route.id);
 
     expect(new Set(sharedLinkRoutes)).toEqual(SHARED_LINK_ROUTES);
+  });
+
+  it('should only skip the shared link password on the shared link login', () => {
+    const routesWithoutPassword = routes
+      .filter((route) => route.auth?.withoutSharedLinkPassword)
+      .map((route) => route.id);
+
+    expect(routesWithoutPassword).toEqual(['POST shared-links/login']);
   });
 
   it('should only require admin access on expected routes outside /admin', () => {

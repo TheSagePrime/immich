@@ -31,7 +31,10 @@ import { AssetService } from 'src/services/asset.service.js';
 import { BaseService } from 'src/services/base.service.js';
 import { TagService } from 'src/services/tag.service.js';
 import type { JobOf } from 'src/types.js';
+import { createSafeFetch } from 'src/utils/safe-fetch.js';
 import { isAllowedHost } from 'src/utils/workflow.js';
+
+const WORKFLOW_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
 
 const dummy = () => {
   throw new Error(
@@ -83,6 +86,7 @@ export class WorkflowExecutionService extends BaseService {
     const addAssetsToAlbums = this.wrap<[dto: AlbumsAddAssetsDto]>((authDto, ctx, args) =>
       albumService.addAssetsToAlbums(authDto, ...args),
     );
+    const { outboundAllowedHosts } = this.configRepository.getEnv().network;
     const httpRequest = this.wrap<
       [
         url: string,
@@ -98,7 +102,12 @@ export class WorkflowExecutionService extends BaseService {
         throw new Error('Hostname did not match any listed in methods[].allowedHosts in the plugin manifest');
       }
 
-      const res = await fetch(...args);
+      const safeFetch = createSafeFetch({
+        allowedHosts: outboundAllowedHosts,
+        maxResponseSize: WORKFLOW_MAX_RESPONSE_SIZE,
+        isUrlAllowed: (url) => isAllowedHost(url.hostname, context.allowedHosts),
+      });
+      const res = await safeFetch(...args);
 
       return {
         ok: res.ok,

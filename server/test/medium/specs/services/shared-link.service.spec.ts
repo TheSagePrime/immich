@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { randomBytes } from 'node:crypto';
-import { AlbumUserRole, SharedLinkType } from 'src/enum.js';
+import { AlbumUserRole, AssetVisibility, SharedLinkType } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
@@ -668,5 +668,32 @@ describe(SharedLinkService.name, () => {
     });
 
     await expect(sut.getMine({ user, sharedLink }, [])).resolves.toHaveProperty('assets', []);
+  });
+
+  it('should not expose an individually shared asset that was moved to the locked folder', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { asset: visible } = await ctx.newAsset({ ownerId: user.id });
+    const { asset: locked } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+    await ctx.newExif({ assetId: visible.id, make: 'Canon' });
+    await ctx.newExif({ assetId: locked.id, make: 'Canon' });
+
+    const sharedLink = await ctx.get(SharedLinkRepository).create({
+      key: randomBytes(16),
+      id: factory.uuid(),
+      userId: user.id,
+      allowUpload: false,
+      allowDownload: true,
+      type: SharedLinkType.Individual,
+      assetIds: [visible.id, locked.id],
+    });
+
+    const access = ctx.get(AccessRepository);
+    await expect(access.asset.checkSharedLinkAccess(sharedLink.id, new Set([visible.id, locked.id]))).resolves.toEqual(
+      new Set([visible.id]),
+    );
+
+    const mine = await sut.getMine({ user, sharedLink }, []);
+    expect(mine.assets.map(({ id }) => id)).toEqual([visible.id]);
   });
 });

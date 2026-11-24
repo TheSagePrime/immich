@@ -58,6 +58,7 @@ import { FolderAlbumSyncTable } from 'src/schema/tables/folder-album-sync.table.
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
+import { LoginAttemptTable } from 'src/schema/tables/login-attempt.table.js';
 import { MemoryAssetAuditTable } from 'src/schema/tables/memory-asset-audit.table.js';
 import { MemoryAssetTable } from 'src/schema/tables/memory-asset.table.js';
 import { MemoryAuditTable } from 'src/schema/tables/memory-audit.table.js';
@@ -135,6 +136,7 @@ export class ImmichDatabase {
     GeodataPlacesTable,
     IntegrityReportTable,
     LibraryTable,
+    LoginAttemptTable,
     MemoryTable,
     MemoryAuditTable,
     MemoryAssetTable,
@@ -257,6 +259,7 @@ export interface DB {
   integrity_report: IntegrityReportTable;
 
   library: LibraryTable;
+  login_attempt: LoginAttemptTable;
 
   memory: MemoryTable;
   memory_audit: MemoryAuditTable;

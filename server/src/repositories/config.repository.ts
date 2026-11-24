@@ -78,6 +78,7 @@ export interface EnvData {
 
   network: {
     trustedProxies: string[];
+    outboundAllowedHosts: string[];
   };
 
   security: {
@@ -364,6 +365,7 @@ const getEnv = (): EnvData => {
 
     network: {
       trustedProxies: dto.IMMICH_TRUSTED_PROXIES ?? ['linklocal', 'uniquelocal'],
+      outboundAllowedHosts: dto.IMMICH_OUTBOUND_ALLOWED_HOSTS ?? [],
     },
 
     security: {

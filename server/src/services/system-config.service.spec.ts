@@ -185,6 +185,14 @@ const updatedConfig = Object.freeze<SystemConfig>({
   },
   passwordLogin: {
     enabled: true,
+    rateLimit: {
+      enabled: true,
+      accountMaxFailures: 5,
+      ipMaxFailures: 30,
+      windowMinutes: 15,
+      lockoutMinutes: 1,
+      maxLockoutMinutes: 60,
+    },
   },
   server: {
     externalDomain: '',

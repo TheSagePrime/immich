@@ -16,11 +16,18 @@ import { AuthService, LoginDetails } from 'src/services/auth.service.js';
 import { getUserAgentDetails } from 'src/utils/request.js';
 
 type AdminRoute = { admin?: true };
-type SharedLinkRoute = { sharedLink?: true };
+type SharedLinkRoute = { sharedLink?: true; withoutSharedLinkPassword?: true };
 type AuthorizedRoute = { permission?: Permission | false; public?: never; setup?: never } & (
   AdminRoute | SharedLinkRoute
 );
-type PublicRoute = { public: true; setup?: true; permission?: never; admin?: never; sharedLink?: never };
+type PublicRoute = {
+  public: true;
+  setup?: true;
+  permission?: never;
+  admin?: never;
+  sharedLink?: never;
+  withoutSharedLinkPassword?: never;
+};
 export type AuthenticatedOptions = AuthorizedRoute | PublicRoute;
 
 type ReflectorTarget = Parameters<Reflector['get']>[1];
@@ -28,7 +35,16 @@ type ReflectorTarget = Parameters<Reflector['get']>[1];
 /** Resolves the `@Authenticated()` options of a route handler, with the defaults applied. */
 export const getAuthenticatedOptions = (reflector: Reflector, targets: ReflectorTarget[]) => {
   const options = reflector.getAllAndOverride<AuthenticatedOptions | undefined>(MetadataKey.AuthRoute, targets);
-  return options && { sharedLink: false, admin: false, public: false, setup: false, ...options };
+  return (
+    options && {
+      sharedLink: false,
+      withoutSharedLinkPassword: false,
+      admin: false,
+      public: false,
+      setup: false,
+      ...options,
+    }
+  );
 };
 
 export const Authenticated = (options: AuthenticatedOptions = {}): ReturnType<typeof applyDecorators> => {
@@ -110,13 +126,19 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
-    const { admin: adminRoute, sharedLink: sharedLinkRoute, permission } = options;
+    const { admin: adminRoute, sharedLink: sharedLinkRoute, withoutSharedLinkPassword, permission } = options;
     const request = context.switchToHttp().getRequest<AuthRequest>();
 
     request.user = await this.authService.authenticate({
       headers: request.headers,
       queryParams: request.query as Record<string, string>,
-      metadata: { adminRoute, sharedLinkRoute, permission, uri: request.path },
+      metadata: {
+        adminRoute,
+        sharedLinkRoute,
+        sharedLinkPasswordRequired: !withoutSharedLinkPassword,
+        permission,
+        uri: request.path,
+      },
     });
 
     return true;

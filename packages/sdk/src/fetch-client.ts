@@ -367,9 +367,24 @@ export type AdminConfigPasskeyDto = {
     /** Enabled */
     enabled: boolean;
 };
+export type AdminConfigPasswordLoginRateLimitDto = {
+    /** Failed logins for one email address before further attempts are locked */
+    accountMaxFailures: number;
+    /** Whether failed password logins are rate limited */
+    enabled: boolean;
+    /** Failed logins from one IP address before further attempts are locked (0 disables) */
+    ipMaxFailures: number;
+    /** Length of the first lockout in minutes */
+    lockoutMinutes: number;
+    /** Upper limit in minutes for lockouts that double with every further failure */
+    maxLockoutMinutes: number;
+    /** Minutes after the last failed login after which the failure count resets */
+    windowMinutes: number;
+};
 export type AdminConfigPasswordLoginDto = {
     /** Enabled */
     enabled: boolean;
+    rateLimit: AdminConfigPasswordLoginRateLimitDto;
 };
 export type AdminConfigReverseGeocodingDto = {
     /** Enabled */

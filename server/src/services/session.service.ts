@@ -24,6 +24,11 @@ export class SessionService extends BaseService {
 
     this.logger.log(`Deleted ${sessions.length} expired session tokens`);
 
+    const { passwordLogin } = await this.getConfig({ withCache: true });
+    const olderThan = DateTime.now().minus({ minutes: passwordLogin.rateLimit.windowMinutes }).toJSDate();
+    const attempts = await this.loginAttemptRepository.cleanup(olderThan);
+    this.logger.log(`Deleted ${attempts} expired failed login records`);
+
     return JobStatus.Success;
   }
 

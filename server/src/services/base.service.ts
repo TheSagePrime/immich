@@ -31,6 +31,7 @@ import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { LoginAttemptRepository } from 'src/repositories/login-attempt.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { MapRepository } from 'src/repositories/map.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
@@ -106,6 +107,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
+  LoginAttemptRepository,
   MachineLearningRepository,
   MapRepository,
   MediaRepository,
@@ -174,6 +176,7 @@ export class BaseService {
     protected integrityRepository: IntegrityRepository,
     protected jobRepository: JobRepository,
     protected libraryRepository: LibraryRepository,
+    protected loginAttemptRepository: LoginAttemptRepository,
     protected machineLearningRepository: MachineLearningRepository,
     protected mapRepository: MapRepository,
     protected mediaRepository: MediaRepository,
@@ -251,6 +254,7 @@ export class BaseService {
       ctx.integrityRepository,
       ctx.jobRepository,
       ctx.libraryRepository,
+      ctx.loginAttemptRepository,
       ctx.machineLearningRepository,
       ctx.mapRepository,
       ctx.mediaRepository,
