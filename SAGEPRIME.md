@@ -289,6 +289,5 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Foundation: none. Writable libraries, safe paths and the rollback command only touch the local file system and the
   database.
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
-
 - Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
   library's import path and the database.
