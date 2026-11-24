@@ -74,3 +74,23 @@ test('sidebar left open closes again when a narrow page renders', async ({ rende
   expect(sidebarStore.isOpen).toBe(false);
   await page.viewport(1280, 720);
 });
+
+test('lists hand-made albums and top-level folder albums only, with a folder badge', async ({
+  data,
+  render,
+  api,
+  app,
+}) => {
+  const root = factory.album({ albumName: 'photos', isFolderAlbum: true, parentAlbumId: null });
+  const child = factory.album({ albumName: '2024', isFolderAlbum: true, parentAlbumId: root.id });
+  data.addAlbums([factory.album({ albumName: 'Holiday' }), root, child]);
+
+  await render(Page, load);
+
+  expect(api.getAllAlbums).toHaveBeenCalledWith({ params: { topLevel: true } });
+  await expect.element(app.albums.card('Holiday')).toBeVisible();
+  await expect.element(app.albums.card('Holiday').getByTestId('folder-album-badge')).not.toBeInTheDocument();
+  await expect.element(app.albums.card('photos').getByTestId('folder-album-badge')).toBeVisible();
+  await expect.element(app.albums.card('photos').getByText('albums_count')).toBeVisible();
+  await expect.element(app.albums.card('2024')).not.toBeInTheDocument();
+});

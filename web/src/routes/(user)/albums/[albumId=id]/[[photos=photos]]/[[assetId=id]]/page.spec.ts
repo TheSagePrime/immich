@@ -98,3 +98,56 @@ test('deleting a comment keeps the other comments', async ({ data, router, rende
   await expect.element(page.getByText('third', { exact: true })).toBeVisible();
   expect(api.deleteActivity).toHaveBeenCalledWith({ params: { id: comments[1].id } });
 });
+
+test('a folder album shows breadcrumbs and child albums and hides membership and rename controls', async ({
+  data,
+  router,
+  render,
+  settle,
+}) => {
+  const owner = [{ role: AlbumUserRole.Owner, user: data.user }];
+  const root = factory.album({ albumName: 'photos', isFolderAlbum: true, parentAlbumId: null, albumUsers: owner });
+  const year = factory.album({ albumName: '2024', isFolderAlbum: true, parentAlbumId: root.id, albumUsers: owner });
+  const trip = factory.album({ albumName: 'trip', isFolderAlbum: true, parentAlbumId: year.id, albumUsers: owner });
+  const asset = factory.asset();
+  data.addAssets(asset);
+  data.addAlbums([root, year, trip]).addToAlbum(trip.id, [asset]);
+  await router.goto(Route.viewAlbum(year), { albumId: year.id });
+
+  await render(Page, load);
+  await settle();
+
+  const breadcrumbs = page.getByTestId('album-folder-breadcrumbs');
+  await expect
+    .element(breadcrumbs.getByRole('link', { name: 'photos' }))
+    .toHaveAttribute('href', Route.viewAlbum(root));
+  await expect.element(breadcrumbs.getByRole('link', { name: 'albums' })).toHaveAttribute('href', Route.albums());
+  await expect
+    .element(breadcrumbs.getByRole('link', { name: 'to_parent' }))
+    .toHaveAttribute('href', Route.viewAlbum(root));
+  await expect.element(page.getByTestId('folder-album-badge')).toBeVisible();
+  await expect.element(page.getByText('folder_album_info')).toBeVisible();
+  await expect.element(page.getByTestId('folder-album-children').getByText('trip')).toBeVisible();
+  await expect.element(page.getByRole('button', { name: 'add_photos' })).not.toBeInTheDocument();
+  await expect.element(page.getByText('select_photos')).not.toBeInTheDocument();
+  await expect.element(page.getByTitle('edit_title')).not.toBeInTheDocument();
+});
+
+test('a hand-made album keeps the add photos button and shows no folder controls', async ({
+  data,
+  router,
+  render,
+  settle,
+}) => {
+  const album = factory.album({ albumUsers: [{ role: AlbumUserRole.Owner, user: data.user }] });
+  data.addAlbums(album);
+  await router.goto(Route.viewAlbum(album), { albumId: album.id });
+
+  await render(Page, load);
+  await settle();
+
+  await expect.element(page.getByRole('button', { name: 'add_photos' })).toBeVisible();
+  await expect.element(page.getByTitle('edit_title')).toBeVisible();
+  await expect.element(page.getByTestId('album-folder-breadcrumbs')).not.toBeInTheDocument();
+  await expect.element(page.getByTestId('folder-album-badge')).not.toBeInTheDocument();
+});
