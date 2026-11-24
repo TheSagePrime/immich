@@ -55,5 +55,24 @@ describe(CliService.name, () => {
 
       await database.destroy();
     });
+
+    it('should drop the upload session table and bring it back when migrating up again', async () => {
+      const database = await getKyselyDB();
+      const { sut, ctx } = setup(database);
+      const hasUploadSessionTable = async () => {
+        const result = await sql<{
+          exists: boolean;
+        }>`select to_regclass('public.upload_session') is not null as "exists"`.execute(database);
+        return result.rows[0].exists;
+      };
+
+      expect(await hasUploadSessionTable()).toBe(true);
+      await sut.revertForkMigrations();
+      expect(await hasUploadSessionTable()).toBe(false);
+      await ctx.get(DatabaseRepository).runMigrations();
+      expect(await hasUploadSessionTable()).toBe(true);
+
+      await database.destroy();
+    });
   });
 });

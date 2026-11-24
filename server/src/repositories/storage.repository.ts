@@ -75,18 +75,6 @@ export class StorageRepository {
     return fs.copyFile(source, target, constants.COPYFILE_EXCL);
   }
 
-  link(source: string, target: string) {
-    return fs.link(source, target);
-  }
-
-  lstat(filepath: string) {
-    return fs.lstat(filepath);
-  }
-
-  async mkdir(folder: string): Promise<void> {
-    await fs.mkdir(folder);
-  }
-
   stat(filepath: string) {
     return fs.stat(filepath);
   }
@@ -97,6 +85,22 @@ export class StorageRepository {
 
   createWriteStream(filepath: string): Writable {
     return createWriteStream(filepath, { flags: 'w', flush: true });
+  }
+
+  createAppendStream(filepath: string): Writable {
+    return createWriteStream(filepath, { flags: 'a', flush: true });
+  }
+
+  link(source: string, target: string) {
+    return fs.link(source, target);
+  }
+
+  async mkdir(filepath: string, mode?: number) {
+    await fs.mkdir(filepath, { mode });
+  }
+
+  lstat(filepath: string) {
+    return fs.lstat(filepath);
   }
 
   createOrOverwriteFile(filepath: string, buffer: Buffer) {
