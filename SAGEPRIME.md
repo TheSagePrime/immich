@@ -97,6 +97,15 @@ Files written to disk by fork features stay on disk.
 The foundation adds no environment variables. Folder uploads add none either; their limits are listed in
 "Reliable folder uploads" below.
 
+Privacy hardening adds these settings (see "Privacy hardening" below):
+
+| Name                             | Where                                            | Default | Meaning                                                                |
+| -------------------------------- | ------------------------------------------------ | ------- | ---------------------------------------------------------------------- |
+| `map.enabled`                    | Administration > Settings > Map & GPS Settings   | off     | Map and map tiles in the web app (upstream default: on)                |
+| `newVersionCheck.enabled`        | Administration > Settings > Version Check        | off     | Hourly check for new releases at `version.immich.cloud` (upstream: on) |
+| `sharedLink.defaultExpiryDays`   | Administration > Settings > Shared Link Settings | 30      | Expiration preselected when a shared link is created in the web app    |
+| `IMMICH_CONTENT_SECURITY_POLICY` | environment variable of `immich-server`          | `true`  | `false` serves the web app without the Content-Security-Policy header  |
+
 ## Foundation
 
 ### Writable external libraries
@@ -144,10 +153,14 @@ database. See "Rolling back to the official v3.4.2 images" above.
   page; after login, an explicit `continue` URL still wins.
 - **Covers, counts and breadcrumbs.** Every child folder shows the number of assets in it (including subfolders) and
   the newest asset as cover. Breadcrumbs show every path segment and every segment is a link.
+- **Same layout as the rest of the app.** The Folders page keeps the main sidebar (with Folders highlighted) and shows
+  folders as an album-style grid of cards; a folder shows its subfolders on top and its photos below. There is no
+  separate folder tree panel.
 - **Folder management in writable libraries.** Inside the first import path of a writable library, the owner of the
   library (or an admin) can create, rename, move and delete folders, rename files (the extension stays the same) and
   move or delete a selection of folders and files. Moves use a folder picker that only lists writable folders.
-  Management controls are hidden everywhere else.
+  These actions live in the page toolbar (New folder, Upload folder here, Select folders), in each card's menu
+  (Rename, Move, Delete) and in the selection bar. Management controls are hidden everywhere else.
 
 ### API (all additive)
 
@@ -285,6 +298,93 @@ All endpoints need the `asset.upload` permission and only work for libraries the
 sessions. Delete the `.immich-upload-tmp` folders in the import paths of writable libraries afterwards; files that were
 already uploaded stay where they are and remain normal library files.
 
+## Privacy hardening
+
+### No third-party calls by default
+
+- **Version check off.** `newVersionCheck.enabled` now defaults to `false`, so the server no longer contacts
+  `version.immich.cloud` every hour. Turn it on in Administration > Settings > Version Check.
+- **Map off.** `map.enabled` now defaults to `false`. The web app hides the map page, the map in the asset info panel
+  and the map commands, and the browser does not load tiles. Turn it on in Administration > Settings > Map & GPS
+  Settings; the style URLs (`https://tiles.immich.cloud/v1/style/light.json` and `.../dark.json`) are unchanged and
+  can point to a self-hosted tile server. Reverse geocoding (place names) keeps working: it uses the local GeoNames
+  data shipped in the image.
+- **Fonts and scripts are self-hosted.** The web build only loads files from the Immich server itself (checked: the
+  only external URLs in the built bundle are links the user clicks, the opt-in Google Cast script and the map tiles).
+- **Which value wins.** Immich only stores settings that differ from the defaults. A server that never changed these
+  settings gets the new defaults (both off) after the upgrade. A setting that was saved explicitly (for example map
+  turned off and on again, or set in a config file with `IMMICH_CONFIG_FILE`) keeps its saved value. After deploying,
+  check both settings once in the admin UI.
+
+### Content-Security-Policy and safe media responses
+
+Every response gets `X-Content-Type-Options: nosniff`.
+
+- **Web app** (`/`, `/photos`, `/index.html`, ...):
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' <sha256 hashes>; script-src-attr 'none'; style-src 'self'
+<sha256 hashes>; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src
+'self' data:; connect-src 'self' blob: https://pay.futo.org; worker-src 'self' blob:; manifest-src 'self'; frame-src
+'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+  No `'unsafe-inline'` or `'unsafe-eval'` for scripts: the two inline scripts and inline styles of `index.html` are
+  allowed by hash. The hashes come from `.csp.json`, which the web build writes next to `index.html` (upstream
+  build step). Inline `style="..."` attributes stay allowed because Svelte and the UI library set them at runtime.
+  `https://pay.futo.org` is only contacted when an admin enters a license key.
+- **Map.** When the map is enabled, the origins of the two map style URLs are added to `connect-src` and `img-src`
+  (for the official tiles also `https://static.immich.cloud`, which serves fonts and sprites). The header follows
+  config changes without a restart. A custom style that loads tiles, fonts or sprites from another host needs that
+  host in a custom policy (see below).
+- **API** (`/api/...`, including asset originals, thumbnails, video playback, downloads and profile images):
+  `default-src 'none'; img-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'unsafe-inline';
+frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox`. An SVG or HTML file opened directly from
+  the API runs in a sandbox without scripts and cannot be framed.
+- **API documentation** (`/doc`): only `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, because
+  Swagger UI needs inline code.
+- **Not affected:** the official mobile apps ignore these headers.
+- **Google Cast** loads a script from `www.gstatic.com`, which the strict policy blocks. Casting from the web app
+  therefore does not work in the fork unless the policy is replaced.
+- **Replacing the policy.** `IMMICH_HELMET_FILE` works like upstream (`true` uses `server/helmet.json`, or a path to
+  your own helmet options); when it sets a `contentSecurityPolicy`, that policy is used for the web app instead of
+  the fork's. `IMMICH_CONTENT_SECURITY_POLICY=false` turns the web app policy off. The API sandbox and `nosniff`
+  headers stay in both cases.
+
+### External libraries and symbolic links
+
+Library scans already skip symbolic links (upstream). The fork also refuses files that are reached through a
+symbolic link that leads outside the import path:
+
+- a file found by a scan or reported by the library watcher whose folder or file resolves (`realpath`) outside the
+  import path is not imported;
+- an existing asset whose file, or one of whose folders, was replaced by such a link is treated as missing on the
+  next scan and goes offline (like a deleted file); it comes back online when the link is removed again;
+- links that stay inside the import path, and an import path that is itself a link (for example a mount point), keep
+  working.
+
+The check costs one `lstat` per file and one `realpath` per folder during a scan.
+
+### Shared links
+
+- **Default expiration.** New links created in the web app have their expiration preselected to
+  `sharedLink.defaultExpiryDays` (30 days by default; `0` preselects "Never"). The user can still pick another date
+  or "Never". The server does not change requests: links created by the mobile app or the API without `expiresAt`
+  still never expire, exactly like upstream, so the official app keeps working.
+- **Revoke all links.** `DELETE /api/shared-links` (permission `sharedLink.delete`, not available to shared-link
+  sessions) deletes every shared link of the calling user and returns `{ "count": <number> }`. Links of other users
+  are not touched. In the web app: Sharing > Shared links > "Revoke all links" (with confirmation). Albums and assets
+  stay; only the links are removed and stop working immediately.
+
+### API (all additive)
+
+| Endpoint               | Permission          | What it does                          |
+| ---------------------- | ------------------- | ------------------------------------- |
+| `DELETE /shared-links` | `sharedLink.delete` | Delete all shared links of the caller |
+
+`AdminConfigDto` and `UserConfigDto` gain `sharedLink.defaultExpiryDays`. No existing endpoint or field changed. The
+defaults returned by `GET /system-config/defaults` changed for `map.enabled` and `newVersionCheck.enabled`.
+
+### Migrations
+
+None.
+
 ## Security hardening
 
 ### Outbound requests are guarded against SSRF
@@ -402,5 +502,23 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
 - Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
   library's import path and the database.
+- Privacy hardening: none added; it removes calls. With the default settings the server and the web app make these
+  outbound calls only:
+  - **Machine learning models:** the official machine-learning container downloads models from Hugging Face
+    (`huggingface.co`) the first time a model is used, unless they are already in its cache volume.
+  - **OAuth:** only when OAuth is configured, the server talks to the configured issuer.
+  - **Email:** only when SMTP is enabled. The email templates reference images on `immich.app` and a font on
+    `fonts.gstatic.com`, which the recipient's mail client may load.
+  - **Version check:** only when turned on (`version.immich.cloud`).
+  - **Map tiles:** in the web app only when the map is turned on (browser to `tiles.immich.cloud` and
+    `static.immich.cloud`, or your own style URLs). The official mobile app does not check the map setting: when a
+    user opens its map, the app loads tiles from the style URLs in `GET /server/config` (unchanged, still
+    `tiles.immich.cloud` unless you change them).
+  - **License activation:** only when an admin enters a license key (browser to `pay.futo.org`).
+  - **Google Cast:** only when a user turns casting on; blocked by the strict policy (see above).
+  - **Workflow plugins:** only when an installed workflow plugin makes HTTP requests; the server only allows the
+    hosts listed in that plugin's manifest (`allowedHosts`). No plugin makes requests by default.
+  - **Reverse geocoding** needs no network at runtime: the GeoNames data is downloaded when the image is built.
+  - **Mobile app:** the official app talks to the Immich server, and to the map tile host as described above.
 - Security hardening: none new. The SSRF guard only restricts the existing calls listed in "Outbound requests are
   guarded against SSRF" (OAuth provider, OAuth profile picture, workflow plugin `httpRequest`, version check).

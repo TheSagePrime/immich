@@ -30,6 +30,44 @@ beforeAll(async () => {
 });
 
 describe(SharedLinkService.name, () => {
+  describe('removeAll', () => {
+    it('should only remove the shared links of the current user', async () => {
+      const { sut, ctx } = setup();
+      const sharedLinkRepo = ctx.get(SharedLinkRepository);
+
+      const { user } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: otherAsset } = await ctx.newAsset({ ownerId: otherUser.id });
+
+      const newLink = (userId: string, values: { albumId?: string; assetIds?: string[] }) =>
+        sharedLinkRepo.create({
+          key: randomBytes(16),
+          id: factory.uuid(),
+          userId,
+          allowUpload: false,
+          type: values.albumId ? SharedLinkType.Album : SharedLinkType.Individual,
+          ...values,
+        });
+
+      await newLink(user.id, { albumId: album.id });
+      await newLink(user.id, { assetIds: [asset.id] });
+      const otherLink = await newLink(otherUser.id, { assetIds: [otherAsset.id] });
+
+      await expect(sut.removeAll(factory.auth({ user }))).resolves.toEqual({ count: 2 });
+
+      await expect(sut.getAll(factory.auth({ user }), {})).resolves.toEqual([]);
+      await expect(sut.getAll(factory.auth({ user: otherUser }), {})).resolves.toEqual([
+        expect.objectContaining({ id: otherLink.id }),
+      ]);
+      await expect(ctx.get(AlbumRepository).getById(album.id)).resolves.toMatchObject({
+        id: album.id,
+      });
+      await expect(sut.removeAll(factory.auth({ user }))).resolves.toEqual({ count: 0 });
+    });
+  });
+
   describe('get', () => {
     it('should return the correct dates on the shared link album', async () => {
       const { sut, ctx } = setup();

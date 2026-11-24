@@ -43,3 +43,32 @@ export const getFolderCrumbs = (path: string) => {
 
 export const canMoveFoldersTo = (destination: string | null | undefined, folderPaths: string[]) =>
   !!destination && folderPaths.every((source) => !isSameOrInsidePath(source, destination));
+
+export const getRelativeFolderPath = (root: string, path: string) => {
+  const normalizedRoot = withoutTrailingSlash(root);
+  const normalizedPath = withoutTrailingSlash(path);
+  if (normalizedRoot === normalizedPath || !isSameOrInsidePath(normalizedRoot, normalizedPath)) {
+    return '';
+  }
+
+  return normalizedPath.slice(normalizedRoot === '/' ? 1 : normalizedRoot.length + 1);
+};
+
+export const findLibraryRootPath = async (
+  path: string,
+  getSummary: (path: string) => Promise<{ isLibraryRoot: boolean; writable: boolean }>,
+) => {
+  let current = withoutTrailingSlash(path);
+  for (;;) {
+    const { isLibraryRoot, writable } = await getSummary(current);
+    if (isLibraryRoot) {
+      return current;
+    }
+
+    if (!writable || current === '/') {
+      return;
+    }
+
+    current = getFolderParentPath(current);
+  }
+};

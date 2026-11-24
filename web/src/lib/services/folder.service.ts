@@ -1,7 +1,8 @@
 import FolderDeleteConfirmModal from '#lib/modals/FolderDeleteConfirmModal.svelte';
 import FolderNameModal from '#lib/modals/FolderNameModal.svelte';
 import FolderPickerModal from '#lib/modals/FolderPickerModal.svelte';
-import { executeMutation } from '#lib/queries/client.ts';
+import FolderUploadModal from '#lib/modals/FolderUploadModal.svelte';
+import { executeMutation, queryClient } from '#lib/queries/client.ts';
 import {
   createFolderMutation,
   deleteFolderItemsMutation,
@@ -9,7 +10,9 @@ import {
   renameFolderAssetMutation,
   renameFolderMutation,
 } from '#lib/queries/folder.query.ts';
-import { getFolderName, splitFileName } from '#lib/utils/folder-utils.ts';
+import { getFolderSummaryQuery } from '#lib/queries/view.query.ts';
+import { openFolderPicker, toFolderUploadEntries } from '#lib/utils/chunked-upload.ts';
+import { findLibraryRootPath, getFolderName, getRelativeFolderPath, splitFileName } from '#lib/utils/folder-utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import type { FolderBulkFailureDto } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
@@ -19,6 +22,7 @@ import {
   mdiFolderEditOutline,
   mdiFolderMoveOutline,
   mdiFolderPlusOutline,
+  mdiFolderUploadOutline,
 } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 
@@ -157,14 +161,34 @@ export const handleDeleteSelection = async (selection: FolderSelection, onChange
   return result;
 };
 
-export const getFolderActions = ($t: MessageFormatter, path: string, onChanged?: OnChanged) => {
+export const handleUploadIntoFolder = async (path: string, libraryId?: string) => {
+  const files = await openFolderPicker();
+  if (files.length === 0) {
+    return;
+  }
+
+  const root = await findLibraryRootPath(path, (folder) => queryClient.fetchQuery(getFolderSummaryQuery(folder))).catch(
+    () => undefined,
+  );
+  const destination = root ? getRelativeFolderPath(root, path) : '';
+
+  await modalManager.show(FolderUploadModal, { entries: toFolderUploadEntries(files), libraryId, destination });
+};
+
+export const getFolderActions = ($t: MessageFormatter, path: string, onChanged?: OnChanged, libraryId?: string) => {
   const CreateFolder: ActionItem = {
     title: $t('new_folder'),
     icon: mdiFolderPlusOutline,
     onAction: () => handleCreateFolder(path, onChanged),
   };
 
-  return { CreateFolder };
+  const UploadFolder: ActionItem = {
+    title: $t('upload_folder_here'),
+    icon: mdiFolderUploadOutline,
+    onAction: () => handleUploadIntoFolder(path, libraryId),
+  };
+
+  return { CreateFolder, UploadFolder };
 };
 
 export const getFolderItemActions = ($t: MessageFormatter, path: string, onChanged?: OnChanged) => {

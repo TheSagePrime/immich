@@ -33,6 +33,7 @@ import { PersonService } from 'src/services/person.service.js';
 import { PluginService } from 'src/services/plugin.service.js';
 import { QueueService } from 'src/services/queue.service.js';
 import { SearchService } from 'src/services/search.service.js';
+import { SecurityHeadersService } from 'src/services/security-headers.service.js';
 import { ServerService } from 'src/services/server.service.js';
 import { SessionService } from 'src/services/session.service.js';
 import { SharedLinkService } from 'src/services/shared-link.service.js';
@@ -92,6 +93,7 @@ export const services = [
   PluginService,
   QueueService,
   SearchService,
+  SecurityHeadersService,
   ServerService,
   SessionService,
   SharedLinkService,

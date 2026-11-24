@@ -25,6 +25,7 @@ import {
   type MetadataSearchDto,
   type PersonResponseDto,
   type SearchResponseDto,
+  type SharedLinkCreateDto,
   type SharedLinkResponseDto,
   type StackResponseDto,
   type TagResponseDto,
@@ -228,6 +229,23 @@ export class MockData {
         return { ...link, album: link.album ? this.getAlbum(link.album.id) : undefined };
       }
     }
+  }
+
+  createSharedLink(dto: SharedLinkCreateDto) {
+    const link = factory.sharedLink({
+      type: dto.type,
+      expiresAt: dto.expiresAt ?? null,
+      description: dto.description || null,
+      assets: (dto.assetIds ?? []).flatMap((id) => this.getAsset(id) ?? []),
+    });
+    this.addSharedLinks(link);
+    return link;
+  }
+
+  removeAllSharedLinks() {
+    const count = this.sharedLinks.size;
+    this.sharedLinks.clear();
+    return { count };
   }
 
   removeSharedLinkAssets(id: string, assetIds: string[]) {

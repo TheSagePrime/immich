@@ -68,6 +68,7 @@ const userConfig = (overrides: Partial<ResponseOf<'getUserConfig'>> = {}): Respo
   trash: { enabled: true, days: 30 },
   notifications: { smtp: { enabled: false } },
   server: { externalDomain: '', loginPageMessage: '', publicUsers: true },
+  sharedLink: { defaultExpiryDays: 30 },
   user: { deleteDelay: 7 },
   ...overrides,
 });
@@ -278,6 +279,7 @@ const adminConfig = (overrides: Partial<ResponseOf<'getAdminConfig'>> = {}): Res
   theme: { customCss: '' },
   library: { scan: { enabled: true, cronExpression: '0 0 * * *' }, watch: { enabled: false } },
   server: { externalDomain: '', loginPageMessage: '', publicUsers: true },
+  sharedLink: { defaultExpiryDays: 30 },
   notifications: {
     smtp: {
       enabled: false,

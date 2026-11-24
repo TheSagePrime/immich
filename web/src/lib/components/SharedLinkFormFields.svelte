@@ -11,6 +11,7 @@
     allowUpload: boolean;
     showMetadata: boolean;
     expiresAt: string | null;
+    defaultExpiryDays?: number;
   };
 
   let {
@@ -21,6 +22,7 @@
     allowUpload = $bindable(),
     showMetadata = $bindable(),
     expiresAt = $bindable(),
+    defaultExpiryDays,
   }: Props = $props();
 
   $effect(() => {
@@ -51,7 +53,7 @@
     <Input bind:value={description} autocomplete="off" />
   </Field>
 
-  <SharedLinkExpiration bind:expiresAt />
+  <SharedLinkExpiration bind:expiresAt {defaultExpiryDays} />
   <Field label={$t('show_metadata')}>
     <Switch bind:checked={showMetadata} />
   </Field>

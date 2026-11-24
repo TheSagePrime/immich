@@ -297,6 +297,25 @@ describe(SharedLinkService.name, () => {
     });
   });
 
+  describe('removeAll', () => {
+    it('should remove every shared link of the user', async () => {
+      mocks.sharedLink.removeAll.mockResolvedValue(2);
+
+      await expect(sut.removeAll(authStub.user1)).resolves.toEqual({ count: 2 });
+
+      expect(mocks.sharedLink.removeAll).toHaveBeenCalledWith(authStub.user1.user.id);
+      expect(mocks.sharedLink.remove).not.toHaveBeenCalled();
+    });
+
+    it('should return zero when there is nothing to remove', async () => {
+      mocks.sharedLink.removeAll.mockResolvedValue(0);
+
+      await expect(sut.removeAll(authStub.admin)).resolves.toEqual({ count: 0 });
+
+      expect(mocks.sharedLink.removeAll).toHaveBeenCalledWith(authStub.admin.user.id);
+    });
+  });
+
   describe('addAssets', () => {
     it('should not work on album shared links', async () => {
       const sharedLink = SharedLinkFactory.from().album().build();

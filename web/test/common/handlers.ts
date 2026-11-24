@@ -183,6 +183,8 @@ export const createHandlers = (data: MockData): Handlers => {
       }
       return link.password === body.password ? { json: link } : invalidPassword;
     },
+    createSharedLink: ({ body }) => ({ status: 201, json: data.createSharedLink(body) }),
+    removeAllSharedLinks: () => ({ json: data.removeAllSharedLinks() }),
     removeSharedLinkAssets: ({ params, body }) => {
       data.removeSharedLinkAssets(params.id, body.assetIds);
       return { json: body.assetIds.map((assetId) => ({ assetId, success: true })) };

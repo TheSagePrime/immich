@@ -52,6 +52,10 @@ export const envData: EnvData = {
     outboundAllowedHosts: [],
   },
 
+  security: {
+    contentSecurityPolicy: true,
+  },
+
   otel: {
     metrics: {
       hostMetrics: false,

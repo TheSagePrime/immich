@@ -81,6 +81,10 @@ export interface EnvData {
     outboundAllowedHosts: string[];
   };
 
+  security: {
+    contentSecurityPolicy: boolean;
+  };
+
   otel: OpenTelemetryModuleOptions;
 
   resourcePaths: {
@@ -362,6 +366,10 @@ const getEnv = (): EnvData => {
     network: {
       trustedProxies: dto.IMMICH_TRUSTED_PROXIES ?? ['linklocal', 'uniquelocal'],
       outboundAllowedHosts: dto.IMMICH_OUTBOUND_ALLOWED_HOSTS ?? [],
+    },
+
+    security: {
+      contentSecurityPolicy: dto.IMMICH_CONTENT_SECURITY_POLICY ?? true,
     },
 
     otel: {

@@ -9,7 +9,7 @@ import { defaultTreeAdapter, parse, parseFragment, type DefaultTreeAdapterMap } 
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type Plugin, type ProxyOptions, type UserConfig } from 'vite';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
@@ -80,6 +80,41 @@ const cspManifest = (): Plugin => ({
       const manifest = JSON.stringify(hashes, (_, value) => (value instanceof Set ? [...value] : value), 2);
       writeFileSync(path.join(buildDir, '.csp.json'), manifest + '\n');
     },
+  },
+});
+
+const serverCspModule = path.resolve(import.meta.dirname, '../server/src/utils/content-security-policy.ts');
+
+type ServerCspModule = {
+  buildWebContentSecurityPolicy: (options: { manifest: Record<string, string[]>; mapSources?: string[] }) => string;
+  getMapCspSources: (map: { enabled: boolean; lightStyle: string; darkStyle: string }) => string[];
+};
+
+const cspPreview = (): Plugin => ({
+  name: 'immich:csp-preview',
+  async configurePreviewServer(server) {
+    if (process.env.IMMICH_PREVIEW_CSP === 'false' || !existsSync(serverCspModule)) {
+      return;
+    }
+
+    const { buildWebContentSecurityPolicy, getMapCspSources } = (await import(
+      pathToFileURL(serverCspModule).href
+    )) as ServerCspModule;
+    const manifest = JSON.parse(readFileSync(path.join(buildDir, '.csp.json'), 'utf8')) as Record<string, string[]>;
+    const mapSources = getMapCspSources({
+      enabled: true,
+      lightStyle: 'https://tiles.immich.cloud/v1/style/light.json',
+      darkStyle: 'https://tiles.immich.cloud/v1/style/dark.json',
+    });
+    const policy = buildWebContentSecurityPolicy({ manifest, mapSources });
+
+    server.middlewares.use((request, response, next) => {
+      if (!request.url?.startsWith('/api')) {
+        response.setHeader('Content-Security-Policy', policy);
+        response.setHeader('X-Content-Type-Options', 'nosniff');
+      }
+      next();
+    });
   },
 });
 
@@ -167,6 +202,7 @@ export default defineConfig({
       },
     }),
     cspManifest(),
+    cspPreview(),
     testing(),
 
     process.env.BUILD_STATS === 'true'

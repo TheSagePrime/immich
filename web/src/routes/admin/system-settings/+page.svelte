@@ -19,6 +19,7 @@
     mdiFileDocumentOutline,
     mdiFolderOutline,
     mdiImageOutline,
+    mdiLinkVariant,
     mdiLockOutline,
     mdiMapMarkerOutline,
     mdiPaletteOutline,
@@ -47,6 +48,7 @@
   import NightlyTasksSettings from './NightlyTasksSettings.svelte';
   import NotificationSettings from './NotificationSettings.svelte';
   import ServerSettings from './ServerSettings.svelte';
+  import SharedLinkSettings from './SharedLinkSettings.svelte';
   import ThemeSettings from './ThemeSettings.svelte';
   import TrashSettings from './TrashSettings.svelte';
   import UserSettings from './UserSettings.svelte';
@@ -157,6 +159,13 @@
       subtitle: $t('admin.server_settings_description'),
       key: 'server',
       icon: mdiServerOutline,
+    },
+    {
+      component: SharedLinkSettings,
+      title: $t('admin.shared_link_settings'),
+      subtitle: $t('admin.shared_link_settings_description'),
+      key: 'shared-links',
+      icon: mdiLinkVariant,
     },
     {
       component: StorageTemplateSettings,
