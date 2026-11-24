@@ -164,7 +164,9 @@ describe('controllers', () => {
   });
 
   it('should only skip the shared link password on the shared link login', () => {
-    const routesWithoutPassword = routes.filter((route) => route.auth?.withoutSharedLinkPassword).map((route) => route.id);
+    const routesWithoutPassword = routes
+      .filter((route) => route.auth?.withoutSharedLinkPassword)
+      .map((route) => route.id);
 
     expect(routesWithoutPassword).toEqual(['POST shared-links/login']);
   });

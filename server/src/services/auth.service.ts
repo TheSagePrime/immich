@@ -581,9 +581,7 @@ export class AuthService extends BaseService {
   private hasSharedLinkPasswordToken(headers: IncomingHttpHeaders, sharedLink: AuthSharedLink) {
     const cookies = parseCookie(headers.cookie || '');
     const tokens = cookies[ImmichCookie.SharedLinkToken]?.split(',') ?? [];
-    const expected = this.cryptoRepository
-      .hashSha256(`${sharedLink.id}-${sharedLink.password}`)
-      .toString('base64');
+    const expected = this.cryptoRepository.hashSha256(`${sharedLink.id}-${sharedLink.password}`).toString('base64');
     return tokens.includes(expected);
   }
 
