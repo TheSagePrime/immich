@@ -11,12 +11,14 @@ export const API_CONTENT_SECURITY_POLICY =
 
 export const DOCS_CONTENT_SECURITY_POLICY = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
 
-const toOrigin = (url: string) => {
-  try {
-    const { protocol, origin } = new URL(url);
-    return protocol === 'https:' || protocol === 'http:' ? origin : undefined;
-  } catch {
-    return undefined;
+const toOrigin = (url: string): string | undefined => {
+  if (!URL.canParse(url)) {
+    return;
+  }
+
+  const { protocol, origin } = new URL(url);
+  if (protocol === 'https:' || protocol === 'http:') {
+    return origin;
   }
 };
 

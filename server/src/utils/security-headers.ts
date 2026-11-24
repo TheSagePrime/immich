@@ -1,11 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-
 import {
   API_CONTENT_SECURITY_POLICY,
-  buildWebContentSecurityPolicy,
   DOCS_CONTENT_SECURITY_POLICY,
+  buildWebContentSecurityPolicy,
   type CspManifest,
 } from 'src/utils/content-security-policy.js';
 
@@ -29,7 +28,10 @@ export const readCspManifest = (manifestFile: string): CspManifest | undefined =
 
   const result: CspManifest = {};
   for (const [directive, sources] of Object.entries(manifest)) {
-    if (!Array.isArray(sources) || sources.some((source) => typeof source !== 'string' || !/^'sha256-[\w+/=]+'$/.test(source))) {
+    if (
+      !Array.isArray(sources) ||
+      sources.some((source) => typeof source !== 'string' || !/^'sha256-[\w+/=]+'$/.test(source))
+    ) {
       throw new Error(`Invalid CSP manifest entry "${directive}": ${manifestFile}`);
     }
     result[directive] = sources as string[];

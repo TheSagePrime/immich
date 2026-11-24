@@ -6,10 +6,13 @@ type SymlinkFileSystem = {
   realpath(path: string): Promise<string>;
 };
 
-const attempt = <T>(operation: () => Promise<T>): Promise<T | undefined> =>
-  Promise.resolve()
-    .then(operation)
-    .catch(() => undefined);
+const attempt = async <T>(operation: () => Promise<T>): Promise<T | undefined> => {
+  try {
+    return await operation();
+  } catch {
+    return;
+  }
+};
 
 export type SymlinkEscapeChecker = (filePath: string) => Promise<boolean>;
 

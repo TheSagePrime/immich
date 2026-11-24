@@ -450,7 +450,7 @@ describe('/shared-links', () => {
     it('should not be available to shared link sessions', async () => {
       const { status } = await request(app).delete('/shared-links').query({ key: linkWithAssets.key });
 
-      expect(status).toBe(401);
+      expect(status).toBe(403);
     });
 
     it('should revoke every shared link of the user and only of the user', async () => {

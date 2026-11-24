@@ -28,7 +28,7 @@ const run = (middleware: ReturnType<typeof createSecurityHeadersMiddleware>, pat
 const directive = (policy: string, name: string) =>
   policy
     .split('; ')
-    .find((item) => item.split(' ')[0] === name)
+    .find((item) => item.split(' ', 1)[0] === name)
     ?.split(' ')
     .slice(1);
 
@@ -82,7 +82,12 @@ describe('buildWebContentSecurityPolicy', () => {
 
   it('should add the map sources', () => {
     const policy = buildWebContentSecurityPolicy({ manifest, mapSources: ['https://tiles.immich.cloud'] });
-    expect(directive(policy, 'connect-src')).toEqual([`'self'`, 'blob:', 'https://pay.futo.org', 'https://tiles.immich.cloud']);
+    expect(directive(policy, 'connect-src')).toEqual([
+      `'self'`,
+      'blob:',
+      'https://pay.futo.org',
+      'https://tiles.immich.cloud',
+    ]);
     expect(directive(policy, 'img-src')).toContain('https://tiles.immich.cloud');
   });
 });

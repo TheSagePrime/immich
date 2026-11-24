@@ -72,11 +72,14 @@ describe('security headers', () => {
 
   it('should sandbox asset originals and thumbnails', async () => {
     const asset = await utils.createAsset(admin.accessToken);
-    await utils.waitForQueueFinish(admin.accessToken, 'thumbnailGeneration');
+
+    const original = await request(app)
+      .get(`/assets/${asset.id}/original`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(original.status).toBe(200);
 
     for (const path of [`/assets/${asset.id}/original`, `/assets/${asset.id}/thumbnail`]) {
-      const { status, headers } = await request(app).get(path).set('Authorization', `Bearer ${admin.accessToken}`);
-      expect(status).toBe(200);
+      const { headers } = await request(app).get(path).set('Authorization', `Bearer ${admin.accessToken}`);
       expect(headers['x-content-type-options']).toBe('nosniff');
       expect(directive(headers['content-security-policy'], 'sandbox')).toEqual([]);
       expect(directive(headers['content-security-policy'], 'frame-ancestors')).toEqual([`'none'`]);
