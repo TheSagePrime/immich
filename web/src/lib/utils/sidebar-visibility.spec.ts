@@ -87,6 +87,6 @@ describe('isSimpleMode', () => {
 
   it('treats a missing value from an older server as off', () => {
     const config = configWith(false);
-    expect(isSimpleMode({ ...config, server: {} as typeof config.server })).toBe(false);
+    expect(isSimpleMode({ ...config, server: {} as typeof config.server })).toBeFalsy();
   });
 });

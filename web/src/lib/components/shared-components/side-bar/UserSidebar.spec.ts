@@ -5,13 +5,15 @@ import { factory } from '#test/common/factories.ts';
 import { payload } from '#test/common/payloads.ts';
 import { cleanup, render } from 'vitest-browser-svelte';
 
-vi.mock('#lib/components/shared-components/side-bar/BottomInfo.svelte', async () => ({
-  default: (await import('#test/unit/mocks/Empty.svelte')).default,
-}));
+vi.mock('#lib/components/shared-components/side-bar/BottomInfo.svelte', async () => {
+  const { default: Empty } = await import('#test/unit/mocks/Empty.svelte');
+  return { default: Empty };
+});
 
-vi.mock('#lib/components/shared-components/side-bar/RecentAlbums.svelte', async () => ({
-  default: (await import('#test/unit/mocks/Empty.svelte')).default,
-}));
+vi.mock('#lib/components/shared-components/side-bar/RecentAlbums.svelte', async () => {
+  const { default: Empty } = await import('#test/unit/mocks/Empty.svelte');
+  return { default: Empty };
+});
 
 const setSimpleMode = (simpleMode: boolean) => {
   const config = payload.userConfig();
@@ -39,8 +41,8 @@ describe('UserSidebar', () => {
     );
   });
 
-  afterEach(async () => {
-    await cleanup();
+  afterEach(() => {
+    cleanup();
     queryClient.clear();
     authManager.reset();
   });

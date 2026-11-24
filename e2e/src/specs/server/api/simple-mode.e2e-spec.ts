@@ -19,7 +19,9 @@ describe('simple mode', () => {
   });
 
   it('should be enabled by default', async () => {
-    const { status, body } = await request(app).get('/admin/config').set('Authorization', `Bearer ${admin.accessToken}`);
+    const { status, body } = await request(app)
+      .get('/admin/config')
+      .set('Authorization', `Bearer ${admin.accessToken}`);
 
     expect(status).toBe(200);
     expect(body.server.simpleMode).toBe(true);

@@ -11,8 +11,7 @@ const setSimpleMode = (data: MockData, simpleMode: boolean) => {
   data.adminConfig = { ...data.adminConfig, server: { ...data.adminConfig.server, simpleMode } };
 };
 
-const sidebarLink = (page: Page, name: string) =>
-  page.locator('#sidebar').getByRole('link', { name, exact: true });
+const sidebarLink = (page: Page, name: string) => page.locator('#sidebar').getByRole('link', { name, exact: true });
 
 test.describe('simple mode', () => {
   test('hides rarely used items from the sidebar', async ({ page, data }) => {

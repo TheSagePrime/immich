@@ -22,6 +22,9 @@ const PUBLIC_PROPERTIES = [
   'server.loginPageMessage',
 ];
 
+const parseSimpleMode = (simpleMode: unknown) =>
+  AdminConfigDto.schema.safeParse({ ...defaults, server: { ...defaults.server, simpleMode } });
+
 describe('config visibility', () => {
   it('should expose every property to admins', () => {
     const paths = getKeysDeep(defaults);
@@ -76,13 +79,10 @@ describe('config visibility', () => {
   });
 
   it('should only accept a boolean for simple mode', () => {
-    const parse = (simpleMode: unknown) =>
-      AdminConfigDto.schema.safeParse({ ...defaults, server: { ...defaults.server, simpleMode } });
-
-    expect(parse(false).success).toBe(true);
-    expect(parse('yes').success).toBe(false);
-    expect(parse(1).success).toBe(false);
-    expect(parse(undefined).success).toBe(false);
+    expect(parseSimpleMode(false).success).toBe(true);
+    expect(parseSimpleMode('yes').success).toBe(false);
+    expect(parseSimpleMode(1).success).toBe(false);
+    expect(parseSimpleMode(undefined).success).toBe(false);
   });
 
   it('should keep the visibility metadata out of the schemas', () => {

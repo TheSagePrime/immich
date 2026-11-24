@@ -21,7 +21,7 @@ type SidebarPreferences = Pick<
   'memories' | 'people' | 'sharedLinks' | 'tags' | 'recentlyAdded' | 'folders'
 >;
 
-export const isSimpleMode = (config: SidebarConfig) => config.server.simpleMode === true;
+export const isSimpleMode = (config: SidebarConfig) => config.server.simpleMode;
 
 export const getSidebarVisibility = (config: SidebarConfig, preferences: SidebarPreferences): SidebarVisibility => {
   const full = !isSimpleMode(config);
