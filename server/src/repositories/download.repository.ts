@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { AssetVisibility } from 'src/enum.js';
+import { escapeLikePattern } from 'src/repositories/view-repository.js';
 import { DB } from 'src/schema/index.js';
 import { anyUuid } from 'src/utils/database.js';
 
@@ -28,6 +29,15 @@ export class DownloadRepository {
     return builder(this.db)
       .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
       .where('album_asset.albumId', '=', albumId)
+      .stream();
+  }
+
+  downloadFolder(userId: string, folderPath: string) {
+    const prefix = folderPath === '/' ? '/' : `${folderPath}/`;
+    return builder(this.db)
+      .where('asset.ownerId', '=', userId)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.originalPath', 'like', `${escapeLikePattern(prefix)}%`)
       .stream();
   }
 

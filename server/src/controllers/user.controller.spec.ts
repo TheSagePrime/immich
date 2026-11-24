@@ -72,5 +72,54 @@ describe(UserController.name, () => {
         ]),
       );
     });
+
+    it('should accept a folder sort', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .put(`/users/me/preferences`)
+        .set('Authorization', `Bearer token`)
+        .send({
+          folders: {
+            sortBy: 'fileSize',
+            sortOrder: 'desc',
+            sortOverrides: [{ path: '/photos/trip', sortBy: 'dateTaken', sortOrder: 'asc' }],
+          },
+        });
+      expect(status).toBe(200);
+      expect(service.updateMyPreferences).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ folders: expect.objectContaining({ sortBy: 'fileSize', sortOrder: 'desc' }) }),
+      );
+    });
+
+    it('should reject an unknown folder sort', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .put(`/users/me/preferences`)
+        .set('Authorization', `Bearer token`)
+        .send({ folders: { sortBy: 'color' } });
+      expect(status).toBe(400);
+      expect(body).toEqual(expect.objectContaining({ message: expect.anything() }));
+      expect(service.updateMyPreferences).not.toHaveBeenCalled();
+    });
+
+    it('should limit the number of folder sort overrides', async () => {
+      const sortOverrides = Array.from({ length: 501 }, (_, index) => ({
+        path: `/folder-${index}`,
+        sortBy: 'name',
+        sortOrder: 'asc',
+      }));
+      const { status } = await request(ctx.getHttpServer())
+        .put(`/users/me/preferences`)
+        .set('Authorization', `Bearer token`)
+        .send({ folders: { sortOverrides } });
+      expect(status).toBe(400);
+    });
+
+    it('should reject a folder sort override without a path', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .put(`/users/me/preferences`)
+        .set('Authorization', `Bearer token`)
+        .send({ folders: { sortOverrides: [{ path: '', sortBy: 'name', sortOrder: 'asc' }] } });
+      expect(status).toBe(400);
+    });
   });
 });

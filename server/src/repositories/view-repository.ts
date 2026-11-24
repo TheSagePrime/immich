@@ -6,7 +6,7 @@ import { AssetFileType, AssetStatus, AssetVisibility, ChecksumAlgorithm } from '
 import { DB } from 'src/schema/index.js';
 import { anyUuid, asUuid, withExif } from 'src/utils/database.js';
 
-const escapeLikePattern = (value: string) => value.replaceAll(/[\\%_]/g, String.raw`\$&`);
+export const escapeLikePattern = (value: string) => value.replaceAll(/[\\%_]/g, String.raw`\$&`);
 
 const toDirectoryPrefix = (partialPath: string) => {
   const directory = trim(partialPath, '/');
@@ -19,6 +19,19 @@ export type FolderSummaryRow = {
   name: string | null;
   assetCount: number;
   coverAssetId: string | null;
+  newestTakenAt: Date | null;
+  oldestTakenAt: Date | null;
+  newestAddedAt: Date | null;
+  oldestAddedAt: Date | null;
+  totalSize: number;
+};
+
+export type FolderDirectoryRow = {
+  libraryId: string | null;
+  directoryPath: string;
+  assetCount: number;
+  coverAssetId: string;
+  newestTakenAt: Date;
 };
 
 export type LibraryAssetPath = {
@@ -69,6 +82,54 @@ export class ViewRepository {
     return results.map((row) => row.directoryPath.replaceAll(/\/$/g, ''));
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getFolderDirectories(userId: string): Promise<FolderDirectoryRow[]> {
+    const { rows } = await sql<FolderDirectoryRow>`
+      with "scoped" as (
+        select
+          "id",
+          "libraryId",
+          "fileCreatedAt",
+          substring("originalPath", '^(.*)/[^/]*$') as "directoryPath"
+        from "asset"
+        where
+          "ownerId" = ${userId}::uuid
+          and "visibility" = ${AssetVisibility.Timeline}
+          and "deletedAt" is null
+          and "fileCreatedAt" is not null
+          and "fileModifiedAt" is not null
+          and "localDateTime" is not null
+      ),
+      "counts" as (
+        select "libraryId", "directoryPath", count(*)::int as "assetCount"
+        from "scoped"
+        group by "libraryId", "directoryPath"
+      ),
+      "covers" as (
+        select distinct on ("libraryId", "directoryPath")
+          "libraryId",
+          "directoryPath",
+          "id" as "coverAssetId",
+          "fileCreatedAt" as "newestTakenAt"
+        from "scoped"
+        order by "libraryId", "directoryPath", "fileCreatedAt" desc, "id"
+      )
+      select
+        "counts"."libraryId",
+        coalesce("counts"."directoryPath", '') as "directoryPath",
+        "counts"."assetCount",
+        "covers"."coverAssetId",
+        "covers"."newestTakenAt"
+      from "counts"
+      inner join "covers"
+        on "covers"."libraryId" is not distinct from "counts"."libraryId"
+        and "covers"."directoryPath" is not distinct from "counts"."directoryPath"
+      order by "directoryPath"
+    `.execute(this.db);
+
+    return rows;
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
   async getAssetsByOriginalPath(userId: string, partialPath: string) {
     const prefix = escapeLikePattern(toDirectoryPrefix(partialPath));
@@ -100,24 +161,34 @@ export class ViewRepository {
     const { rows } = await sql<FolderSummaryRow>`
       with "scoped" as (
         select
-          "id",
-          "fileCreatedAt",
+          "asset"."id",
+          "asset"."fileCreatedAt",
+          "asset"."createdAt",
+          "asset_exif"."fileSizeInByte",
           case
-            when strpos(substr("originalPath", length(${prefix}::text) + 1), '/') > 0
-            then split_part(substr("originalPath", length(${prefix}::text) + 1), '/', 1)
+            when strpos(substr("asset"."originalPath", length(${prefix}::text) + 1), '/') > 0
+            then split_part(substr("asset"."originalPath", length(${prefix}::text) + 1), '/', 1)
           end as "name"
         from "asset"
+        left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
         where
-          "ownerId" = ${userId}::uuid
-          and "originalPath" like ${pattern}
-          and "visibility" = ${AssetVisibility.Timeline}
-          and "deletedAt" is null
-          and "fileCreatedAt" is not null
-          and "fileModifiedAt" is not null
-          and "localDateTime" is not null
+          "asset"."ownerId" = ${userId}::uuid
+          and "asset"."originalPath" like ${pattern}
+          and "asset"."visibility" = ${AssetVisibility.Timeline}
+          and "asset"."deletedAt" is null
+          and "asset"."fileCreatedAt" is not null
+          and "asset"."fileModifiedAt" is not null
+          and "asset"."localDateTime" is not null
       ),
       "counts" as (
-        select "name", count(*)::int as "assetCount"
+        select
+          "name",
+          count(*)::int as "assetCount",
+          max("fileCreatedAt") as "newestTakenAt",
+          min("fileCreatedAt") as "oldestTakenAt",
+          max("createdAt") as "newestAddedAt",
+          min("createdAt") as "oldestAddedAt",
+          coalesce(sum("fileSizeInByte"), 0)::float8 as "totalSize"
         from "scoped"
         group by "name"
       ),
@@ -127,7 +198,15 @@ export class ViewRepository {
         where "name" is not null
         order by "name", "fileCreatedAt" desc, "id"
       )
-      select "counts"."name", "counts"."assetCount", "covers"."coverAssetId"
+      select
+        "counts"."name",
+        "counts"."assetCount",
+        "covers"."coverAssetId",
+        "counts"."newestTakenAt",
+        "counts"."oldestTakenAt",
+        "counts"."newestAddedAt",
+        "counts"."oldestAddedAt",
+        "counts"."totalSize"
       from "counts"
       left join "covers" on "covers"."name" = "counts"."name"
       order by "counts"."name" asc nulls first

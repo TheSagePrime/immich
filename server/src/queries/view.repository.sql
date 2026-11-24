@@ -15,6 +15,62 @@ where
 order by
   "directoryPath" asc
 
+-- ViewRepository.getFolderDirectories
+with
+  "scoped" as (
+    select
+      "id",
+      "libraryId",
+      "fileCreatedAt",
+      substring("originalPath", '^(.*)/[^/]*$') as "directoryPath"
+    from
+      "asset"
+    where
+      "ownerId" = $1::uuid
+      and "visibility" = $2
+      and "deletedAt" is null
+      and "fileCreatedAt" is not null
+      and "fileModifiedAt" is not null
+      and "localDateTime" is not null
+  ),
+  "counts" as (
+    select
+      "libraryId",
+      "directoryPath",
+      count(*)::int as "assetCount"
+    from
+      "scoped"
+    group by
+      "libraryId",
+      "directoryPath"
+  ),
+  "covers" as (
+    select distinct
+      on ("libraryId", "directoryPath") "libraryId",
+      "directoryPath",
+      "id" as "coverAssetId",
+      "fileCreatedAt" as "newestTakenAt"
+    from
+      "scoped"
+    order by
+      "libraryId",
+      "directoryPath",
+      "fileCreatedAt" desc,
+      "id"
+  )
+select
+  "counts"."libraryId",
+  coalesce("counts"."directoryPath", '') as "directoryPath",
+  "counts"."assetCount",
+  "covers"."coverAssetId",
+  "covers"."newestTakenAt"
+from
+  "counts"
+  inner join "covers" on "covers"."libraryId" is not distinct from "counts"."libraryId"
+  and "covers"."directoryPath" is not distinct from "counts"."directoryPath"
+order by
+  "directoryPath"
+
 -- ViewRepository.getAssetsByOriginalPath
 select
   "asset".*,
@@ -38,30 +94,41 @@ order by
 with
   "scoped" as (
     select
-      "id",
-      "fileCreatedAt",
+      "asset"."id",
+      "asset"."fileCreatedAt",
+      "asset"."createdAt",
+      "asset_exif"."fileSizeInByte",
       case
-        when strpos(substr("originalPath", length($1::text) + 1), '/') > 0 then split_part(
-          substr("originalPath", length($2::text) + 1),
+        when strpos(
+          substr("asset"."originalPath", length($1::text) + 1),
+          '/'
+        ) > 0 then split_part(
+          substr("asset"."originalPath", length($2::text) + 1),
           '/',
           1
         )
       end as "name"
     from
       "asset"
+      left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
     where
-      "ownerId" = $3::uuid
-      and "originalPath" like $4
-      and "visibility" = $5
-      and "deletedAt" is null
-      and "fileCreatedAt" is not null
-      and "fileModifiedAt" is not null
-      and "localDateTime" is not null
+      "asset"."ownerId" = $3::uuid
+      and "asset"."originalPath" like $4
+      and "asset"."visibility" = $5
+      and "asset"."deletedAt" is null
+      and "asset"."fileCreatedAt" is not null
+      and "asset"."fileModifiedAt" is not null
+      and "asset"."localDateTime" is not null
   ),
   "counts" as (
     select
       "name",
-      count(*)::int as "assetCount"
+      count(*)::int as "assetCount",
+      max("fileCreatedAt") as "newestTakenAt",
+      min("fileCreatedAt") as "oldestTakenAt",
+      max("createdAt") as "newestAddedAt",
+      min("createdAt") as "oldestAddedAt",
+      coalesce(sum("fileSizeInByte"), 0)::float8 as "totalSize"
     from
       "scoped"
     group by
@@ -83,7 +150,12 @@ with
 select
   "counts"."name",
   "counts"."assetCount",
-  "covers"."coverAssetId"
+  "covers"."coverAssetId",
+  "counts"."newestTakenAt",
+  "counts"."oldestTakenAt",
+  "counts"."newestAddedAt",
+  "counts"."oldestAddedAt",
+  "counts"."totalSize"
 from
   "counts"
   left join "covers" on "covers"."name" = "counts"."name"

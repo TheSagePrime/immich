@@ -1,6 +1,14 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
-import { ImmichEnvironment, JobName, JobStatus, PersonUpdateStrategy, UserAvatarColor } from 'src/enum.js';
+import {
+  AssetOrder,
+  FolderSortBy,
+  ImmichEnvironment,
+  JobName,
+  JobStatus,
+  PersonUpdateStrategy,
+  UserAvatarColor,
+} from 'src/enum.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
@@ -265,6 +273,29 @@ describe(UserService.name, () => {
       });
       await expect(sut.updateMyPreferences(auth, dto)).resolves.toMatchObject(dto);
       await expect(sut.getMyPreferences(auth)).resolves.toMatchObject(dto);
+    });
+
+    it('should store the folder sort and the per-folder overrides', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+
+      await expect(sut.getMyPreferences(auth)).resolves.toMatchObject({
+        folders: { sortBy: FolderSortBy.Name, sortOrder: AssetOrder.Asc, sortOverrides: [] },
+      });
+
+      const sortOverrides = [
+        { path: '/photos/trip', sortBy: FolderSortBy.FileSize, sortOrder: AssetOrder.Desc },
+        { path: '/photos/day.2', sortBy: FolderSortBy.DateAdded, sortOrder: AssetOrder.Asc },
+      ];
+      const dto = { folders: { sortBy: FolderSortBy.DateTaken, sortOrder: AssetOrder.Desc, sortOverrides } };
+      await expect(sut.updateMyPreferences(auth, dto)).resolves.toMatchObject(dto);
+      await expect(sut.getMyPreferences(auth)).resolves.toMatchObject(dto);
+
+      await sut.updateMyPreferences(auth, { folders: { enabled: true, sidebarWeb: false } });
+      await expect(sut.getMyPreferences(auth)).resolves.toMatchObject({
+        folders: { sidebarWeb: false, sortBy: FolderSortBy.DateTaken, sortOverrides },
+      });
     });
   });
 

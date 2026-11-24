@@ -91,6 +91,25 @@ export enum StartPage {
 
 export const StartPageSchema = z.enum(StartPage).describe('Page shown after login').meta({ id: 'StartPage' });
 
+export enum FolderRootKind {
+  Library = 'library',
+  Uploads = 'uploads',
+}
+
+export const FolderRootKindSchema = z.enum(FolderRootKind).describe('Folder root kind').meta({ id: 'FolderRootKind' });
+
+export enum FolderSortBy {
+  Name = 'name',
+  DateTaken = 'dateTaken',
+  DateAdded = 'dateAdded',
+  FileSize = 'fileSize',
+}
+
+export const FolderSortBySchema = z
+  .enum(FolderSortBy)
+  .describe('Sort key for the folders and assets of a folder')
+  .meta({ id: 'FolderSortBy' });
+
 export enum AssetOrderBy {
   TakenAt = 'takenAt',
   CreatedAt = 'createdAt',

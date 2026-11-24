@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
+import { FolderRootKindSchema } from 'src/enum.js';
 
 export const FOLDER_BULK_MAX_ITEMS = 1000;
 
@@ -37,6 +38,31 @@ const FolderSummaryItemSchema = z
     path: z.string().describe('Absolute child folder path'),
     assetCount: z.int().min(0).describe('Number of assets in the child folder and its subfolders'),
     coverAssetId: z.uuidv4().nullable().describe('Newest asset in the child folder, used as its cover'),
+    newestTakenAt: z
+      .string()
+      .meta({ format: 'date-time' })
+      .nullable()
+      .optional()
+      .describe('Newest date taken (fileCreatedAt) of the assets in the child folder'),
+    oldestTakenAt: z
+      .string()
+      .meta({ format: 'date-time' })
+      .nullable()
+      .optional()
+      .describe('Oldest date taken (fileCreatedAt) of the assets in the child folder'),
+    newestAddedAt: z
+      .string()
+      .meta({ format: 'date-time' })
+      .nullable()
+      .optional()
+      .describe('Newest date added (createdAt) of the assets in the child folder'),
+    oldestAddedAt: z
+      .string()
+      .meta({ format: 'date-time' })
+      .nullable()
+      .optional()
+      .describe('Oldest date added (createdAt) of the assets in the child folder'),
+    totalSize: z.int().min(0).optional().describe('Total file size in bytes of the assets in the child folder'),
   })
   .meta({ id: 'FolderSummaryItemDto' });
 
@@ -50,6 +76,28 @@ const FolderSummaryResponseSchema = z
     isLibraryRoot: z.boolean().describe('Whether the folder is the root of a writable library'),
   })
   .meta({ id: 'FolderSummaryResponseDto' });
+
+export const FOLDER_ROOT_UPLOADS_ID = 'uploads';
+
+const FolderRootFolderSchema = z
+  .object({
+    name: z.string().describe('Display name of the folder inside the root'),
+    path: z.string().describe('Absolute folder path, as returned by the other folder endpoints'),
+    writable: z.boolean().describe('Whether the folder can be managed (inside a writable library)'),
+  })
+  .meta({ id: 'FolderRootFolderDto' });
+
+const FolderRootSchema = z
+  .object({
+    id: z.string().describe('Library ID, or "uploads" for the assets uploaded to Immich'),
+    kind: FolderRootKindSchema,
+    name: z.string().describe('Library name, or "Uploads"'),
+    writable: z.boolean().describe('Whether any folder of the root can be managed'),
+    assetCount: z.int().min(0).describe('Number of assets in the root'),
+    coverAssetId: z.uuidv4().nullable().describe('Newest asset in the root, used as its cover'),
+    folders: z.array(FolderRootFolderSchema).describe('Top level folders of the root'),
+  })
+  .meta({ id: 'FolderRootDto' });
 
 const FolderBrowseQuerySchema = z
   .object({
@@ -165,6 +213,8 @@ const FolderDeleteResponseSchema = z
 export class FolderSummaryQueryDto extends createZodDto(FolderSummaryQuerySchema) {}
 export class FolderSummaryItemDto extends createZodDto(FolderSummaryItemSchema) {}
 export class FolderSummaryResponseDto extends createZodDto(FolderSummaryResponseSchema) {}
+export class FolderRootFolderDto extends createZodDto(FolderRootFolderSchema) {}
+export class FolderRootDto extends createZodDto(FolderRootSchema) {}
 export class FolderBrowseQueryDto extends createZodDto(FolderBrowseQuerySchema) {}
 export class FolderBrowseResponseDto extends createZodDto(FolderBrowseResponseSchema) {}
 export class FolderCreateDto extends createZodDto(FolderCreateSchema) {}

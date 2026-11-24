@@ -708,11 +708,21 @@ export type FolderAlbumsResponse = {
     /** Whether every folder is mirrored as an album */
     enabled: boolean;
 };
+export type FolderSortOverride = {
+    /** Folder path */
+    path: string;
+    sortBy: FolderSortBy;
+    sortOrder: AssetOrder;
+};
 export type FoldersResponse = {
     /** Whether folders are enabled */
     enabled: boolean;
     /** Whether folders appear in web sidebar */
     sidebarWeb: boolean;
+    sortBy?: FolderSortBy;
+    sortOrder?: AssetOrder;
+    /** Sort chosen for individual folders */
+    sortOverrides?: FolderSortOverride[];
 };
 export type MemoriesResponse = {
     /** Memory duration in seconds */
@@ -809,6 +819,10 @@ export type FoldersUpdate = {
     enabled?: boolean;
     /** Whether folders appear in web sidebar */
     sidebarWeb?: boolean;
+    sortBy?: FolderSortBy;
+    sortOrder?: AssetOrder;
+    /** Sort chosen for individual folders, replaces the stored list */
+    sortOverrides?: FolderSortOverride[];
 };
 export type MemoriesUpdate = {
     /** Memory duration in seconds */
@@ -1757,6 +1771,8 @@ export type DownloadInfoDto = {
     archiveSize?: number;
     /** Asset IDs to download */
     assetIds?: string[];
+    /** Folder to download, including its subfolders (only assets of the current user) */
+    folderPath?: string;
     /** User ID to download assets from */
     userId?: string;
 };
@@ -3546,6 +3562,29 @@ export type CreateProfileImageResponseDto = {
     /** User ID */
     userId: string;
 };
+export type FolderRootFolderDto = {
+    /** Display name of the folder inside the root */
+    name: string;
+    /** Absolute folder path, as returned by the other folder endpoints */
+    path: string;
+    /** Whether the folder can be managed (inside a writable library) */
+    writable: boolean;
+};
+export type FolderRootDto = {
+    /** Number of assets in the root */
+    assetCount: number;
+    /** Newest asset in the root, used as its cover */
+    coverAssetId: string | null;
+    /** Top level folders of the root */
+    folders: FolderRootFolderDto[];
+    /** Library ID, or "uploads" for the assets uploaded to Immich */
+    id: string;
+    kind: FolderRootKind;
+    /** Library name, or "Uploads" */
+    name: string;
+    /** Whether any folder of the root can be managed */
+    writable: boolean;
+};
 export type FolderSummaryItemDto = {
     /** Number of assets in the child folder and its subfolders */
     assetCount: number;
@@ -3553,8 +3592,18 @@ export type FolderSummaryItemDto = {
     coverAssetId: string | null;
     /** Child folder name */
     name: string;
+    /** Newest date added (createdAt) of the assets in the child folder */
+    newestAddedAt?: string | null;
+    /** Newest date taken (fileCreatedAt) of the assets in the child folder */
+    newestTakenAt?: string | null;
+    /** Oldest date added (createdAt) of the assets in the child folder */
+    oldestAddedAt?: string | null;
+    /** Oldest date taken (fileCreatedAt) of the assets in the child folder */
+    oldestTakenAt?: string | null;
     /** Absolute child folder path */
     path: string;
+    /** Total file size in bytes of the assets in the child folder */
+    totalSize?: number;
 };
 export type FolderSummaryResponseDto = {
     /** Child folders */
@@ -8517,6 +8566,17 @@ export function getAssetsByOriginalPath({ path }: {
     }));
 }
 /**
+ * Retrieve folder roots
+ */
+export function getFolderRoots(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderRootDto[];
+    }>("/view/folder/roots", {
+        ...opts
+    }));
+}
+/**
  * Retrieve a folder summary
  */
 export function getFolderSummary({ path }: {
@@ -8808,6 +8868,12 @@ export enum CalendarHeatmapType {
 export enum AssetOrder {
     Asc = "asc",
     Desc = "desc"
+}
+export enum FolderSortBy {
+    Name = "name",
+    DateTaken = "dateTaken",
+    DateAdded = "dateAdded",
+    FileSize = "fileSize"
 }
 export enum StartPage {
     Timeline = "timeline",
@@ -9362,6 +9428,10 @@ export enum UploadOutcome {
     Renamed = "renamed",
     Skipped = "skipped",
     Failed = "failed"
+}
+export enum FolderRootKind {
+    Library = "library",
+    Uploads = "uploads"
 }
 export enum WorkflowResult {
     Completed = "completed",

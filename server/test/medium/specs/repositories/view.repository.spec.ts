@@ -47,6 +47,62 @@ describe(ViewRepository.name, () => {
     });
   });
 
+  describe('getFolderDirectories', () => {
+    it('should count the assets of the user per library and directory with the newest cover', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: otherUser } = await ctx.newUser();
+      const library = await ctx.database
+        .insertInto('library')
+        .values({ ownerId: user.id, name: 'Media', importPaths: ['/mnt/media'], exclusionPatterns: [] })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        originalPath: '/mnt/media/Trips/a.jpg',
+        fileCreatedAt: date(1),
+      });
+      const { asset: newest } = await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        originalPath: '/mnt/media/Trips/b.jpg',
+        fileCreatedAt: date(4),
+      });
+      const { asset: upload } = await ctx.newAsset({
+        ownerId: user.id,
+        originalPath: '/data/library/admin/2026/c.jpg',
+        fileCreatedAt: date(2),
+      });
+      const { asset: atRoot } = await ctx.newAsset({
+        ownerId: user.id,
+        originalPath: '/d.jpg',
+        fileCreatedAt: date(3),
+      });
+      await ctx.newAsset({ ownerId: user.id, originalPath: '/data/library/admin/2026/e.jpg', deletedAt: date(5) });
+      await ctx.newAsset({ ownerId: otherUser.id, originalPath: '/mnt/media/Trips/f.jpg' });
+
+      await expect(sut.getFolderDirectories(user.id)).resolves.toEqual([
+        { libraryId: null, directoryPath: '', assetCount: 1, coverAssetId: atRoot.id, newestTakenAt: date(3) },
+        {
+          libraryId: null,
+          directoryPath: '/data/library/admin/2026',
+          assetCount: 1,
+          coverAssetId: upload.id,
+          newestTakenAt: date(2),
+        },
+        {
+          libraryId: library.id,
+          directoryPath: '/mnt/media/Trips',
+          assetCount: 2,
+          coverAssetId: newest.id,
+          newestTakenAt: date(4),
+        },
+      ]);
+    });
+  });
+
   describe('getFolderSummary', () => {
     it('should count assets per child folder and pick the newest asset as cover', async () => {
       const { ctx, sut } = setup();
@@ -80,13 +136,69 @@ describe(ViewRepository.name, () => {
       await ctx.newAsset({ ownerId: otherUser.id, originalPath: '/photos/a_b/other.jpg', fileCreatedAt: date(9) });
       await ctx.newAsset({ ownerId: user.id, originalPath: '/photosx/4.jpg' });
 
-      await expect(sut.getFolderSummary(user.id, '/photos/')).resolves.toEqual([
+      await expect(sut.getFolderSummary(user.id, '/photos/')).resolves.toMatchObject([
         { name: null, assetCount: 1, coverAssetId: null },
         { name: 'a_b', assetCount: 2, coverAssetId: newest.id },
         { name: 'axb', assetCount: 1, coverAssetId: other.id },
       ]);
 
-      await expect(sut.getFolderSummary(user.id, 'photos/a_')).resolves.toEqual([]);
+      await expect(sut.getFolderSummary(user.id, 'photos/a_')).resolves.toMatchObject([]);
+    });
+
+    it('should return the date and size metrics of each child folder', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: first } = await ctx.newAsset({
+        ownerId: user.id,
+        originalPath: '/photos/trip/1.jpg',
+        fileCreatedAt: date(3),
+        createdAt: date(20),
+      });
+      const { asset: second } = await ctx.newAsset({
+        ownerId: user.id,
+        originalPath: '/photos/trip/day 2/2.jpg',
+        fileCreatedAt: date(7),
+        createdAt: date(15),
+      });
+      await ctx.newAsset({
+        ownerId: user.id,
+        originalPath: '/photos/trip/3.jpg',
+        fileCreatedAt: date(5),
+        createdAt: date(25),
+      });
+      const { asset: direct } = await ctx.newAsset({
+        ownerId: user.id,
+        originalPath: '/photos/direct.jpg',
+        fileCreatedAt: date(1),
+        createdAt: date(1),
+      });
+      await ctx.newExif({ assetId: first.id, fileSizeInByte: 1000 });
+      await ctx.newExif({ assetId: second.id, fileSizeInByte: 2500 });
+      await ctx.newExif({ assetId: direct.id, fileSizeInByte: 9 });
+
+      await expect(sut.getFolderSummary(user.id, '/photos')).resolves.toEqual([
+        {
+          name: null,
+          assetCount: 1,
+          coverAssetId: null,
+          newestTakenAt: date(1),
+          oldestTakenAt: date(1),
+          newestAddedAt: date(1),
+          oldestAddedAt: date(1),
+          totalSize: 9,
+        },
+        {
+          name: 'trip',
+          assetCount: 3,
+          coverAssetId: second.id,
+          newestTakenAt: date(7),
+          oldestTakenAt: date(3),
+          newestAddedAt: date(25),
+          oldestAddedAt: date(15),
+          totalSize: 3500,
+        },
+      ]);
     });
 
     it('should summarize the root folder', async () => {
@@ -95,7 +207,7 @@ describe(ViewRepository.name, () => {
       await ctx.newAsset({ ownerId: user.id, originalPath: '/root.jpg' });
       const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath: '/photos/1.jpg' });
 
-      await expect(sut.getFolderSummary(user.id, '/')).resolves.toEqual([
+      await expect(sut.getFolderSummary(user.id, '/')).resolves.toMatchObject([
         { name: null, assetCount: 1, coverAssetId: null },
         { name: 'photos', assetCount: 1, coverAssetId: asset.id },
       ]);
@@ -107,7 +219,7 @@ describe(ViewRepository.name, () => {
       await ctx.newAsset({ ownerId: user.id, originalPath: '/a%b/1.jpg' });
       await ctx.newAsset({ ownerId: user.id, originalPath: '/aXb/sub/1.jpg' });
 
-      await expect(sut.getFolderSummary(user.id, '/a%b')).resolves.toEqual([
+      await expect(sut.getFolderSummary(user.id, '/a%b')).resolves.toMatchObject([
         { name: null, assetCount: 1, coverAssetId: null },
       ]);
     });
