@@ -41,9 +41,10 @@ const createFolder = async (files: Record<string, string>) => {
 };
 
 const pickFolder = async (page: Page, folder: string) => {
-  const chooser = page.waitForEvent('filechooser');
+  const chooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'upload_folder', exact: true }).filter({ visible: true }).click();
-  await (await chooser).setFiles(folder);
+  const chooser = await chooserPromise;
+  await chooser.setFiles(folder);
 };
 
 const panel = (page: Page) => page.getByTestId('folder-upload-panel');
@@ -215,5 +216,24 @@ test.describe('folder upload', () => {
     const box = await overlay.boundingBox();
     const viewport = page.viewportSize()!;
     expect(box).toMatchObject({ x: 0, y: 0, width: viewport.width, height: viewport.height });
+  });
+
+  test('keeps the album upload when dragging over an album', async ({ page, data }) => {
+    data.addLibraries(factory.library({ writable: true }));
+    const album = factory.album({ albumName: 'Holiday' });
+    data.addAlbums(album);
+    await page.goto(Route.viewAlbum(album));
+    await expect(page).toHaveTitle(/Holiday/);
+
+    await page.evaluate(() => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(new File(['x'], 'a.jpg'));
+      document.body.dispatchEvent(new DragEvent('dragenter', { dataTransfer, bubbles: true }));
+    });
+
+    const overlay = page.getByTestId('drop-overlay');
+    await expect(overlay).toBeVisible();
+    await expect(overlay).toContainText('drop_files_to_upload');
+    await expect(overlay).not.toContainText('drop_files_or_folders_to_upload');
   });
 });

@@ -87,6 +87,9 @@
     if (message === 'exists') {
       return $t('errors.upload_file_exists');
     }
+    if (message === 'partial_gone') {
+      return $t('errors.upload_partial_gone');
+    }
     return message;
   };
 </script>

@@ -62,12 +62,13 @@ export class UploadSessionRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, UploadSessionStatus.Active, { status: UploadSessionStatus.Completing }] })
-  updateIfStatus(id: string, status: UploadSessionStatus, dto: Updateable<UploadSessionTable>) {
+  updateIfStatus(id: string, status: UploadSessionStatus, dto: Updateable<UploadSessionTable>, updatedBefore?: Date) {
     return this.db
       .updateTable('upload_session')
       .set(dto)
       .where('id', '=', asUuid(id))
       .where('status', '=', status)
+      .$if(!!updatedBefore, (qb) => qb.where('updatedAt', '<', updatedBefore!))
       .returningAll()
       .executeTakeFirst();
   }

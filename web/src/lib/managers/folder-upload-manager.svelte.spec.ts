@@ -132,6 +132,77 @@ describe('FolderUploadManager', () => {
     expect(sut.failedFiles).toBe(0);
   });
 
+  it('waits for the server instead of failing when completing times out', async () => {
+    deps.completeSession.mockRejectedValueOnce(new ChunkUploadError(504));
+    deps.getSession
+      .mockResolvedValueOnce(makeSession({ status: UploadSessionStatus.Completing, offset: 10 }))
+      .mockResolvedValueOnce(completed(UploadOutcome.Created));
+    startOne();
+    await settled();
+
+    expect(deps.completeSession).toHaveBeenCalledTimes(1);
+    expect(deps.createSession).toHaveBeenCalledTimes(1);
+    expect([...sut.items.values()][0]).toMatchObject({ state: FolderUploadState.Done, assetId: 'asset-1' });
+  });
+
+  it('reuses a session that was completed before the page was reloaded', async () => {
+    const file = makeFile('a.jpg', '0123456789');
+    resumeStore.set(`library-1|Dest/Trip/a.jpg|10|1234`, {
+      sessionId: 'session-1',
+      relativePath: 'Dest/Trip/a.jpg',
+      libraryId: 'library-1',
+    });
+    deps.getSession.mockResolvedValue(completed(UploadOutcome.Created));
+    sut.start({
+      libraryId: 'library-1',
+      destination: 'Dest',
+      duplicatePolicy: UploadDuplicatePolicy.KeepBoth,
+      entries: [{ file, relativePath: 'Trip/a.jpg' }],
+    });
+    await settled();
+
+    expect(deps.createSession).not.toHaveBeenCalled();
+    expect(deps.sendChunk).not.toHaveBeenCalled();
+    expect([...sut.items.values()][0].state).toBe(FolderUploadState.Done);
+    expect(resumeStore.count()).toBe(0);
+  });
+
+  it('asks the server to finish a session that was completing before the page was reloaded', async () => {
+    const file = makeFile('a.jpg', '0123456789');
+    resumeStore.set(`library-1|Dest/Trip/a.jpg|10|1234`, {
+      sessionId: 'session-1',
+      relativePath: 'Dest/Trip/a.jpg',
+      libraryId: 'library-1',
+    });
+    deps.getSession
+      .mockResolvedValueOnce(makeSession({ status: UploadSessionStatus.Completing, offset: 10 }))
+      .mockResolvedValueOnce(completed(UploadOutcome.Created));
+    deps.completeSession.mockRejectedValueOnce(
+      new ChunkUploadError(409, { message: 'Upload is already being completed' }),
+    );
+    sut.start({
+      libraryId: 'library-1',
+      destination: 'Dest',
+      duplicatePolicy: UploadDuplicatePolicy.KeepBoth,
+      entries: [{ file, relativePath: 'Trip/a.jpg' }],
+    });
+    await settled();
+
+    expect(deps.completeSession).toHaveBeenCalledWith({ id: 'session-1' });
+    expect(deps.createSession).not.toHaveBeenCalled();
+    expect(deps.sendChunk).not.toHaveBeenCalled();
+    expect([...sut.items.values()][0]).toMatchObject({ state: FolderUploadState.Done, assetId: 'asset-1' });
+  });
+
+  it('retries a chunk while the server is still writing the previous one', async () => {
+    deps.sendChunk.mockRejectedValueOnce(new ChunkUploadError(409, { message: 'busy' }));
+    startOne();
+    await settled();
+
+    expect(deps.wait).toHaveBeenCalled();
+    expect([...sut.items.values()][0].state).toBe(FolderUploadState.Done);
+  });
+
   it('adopts the server offset after a 409', async () => {
     deps.sendChunk.mockRejectedValueOnce(new ChunkUploadError(409, { offset: 8 }));
     startOne();

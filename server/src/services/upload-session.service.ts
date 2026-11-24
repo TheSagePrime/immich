@@ -14,6 +14,7 @@ import { pipeline } from 'node:stream/promises';
 import picomatch from 'picomatch';
 import {
   UPLOAD_CHUNK_SIZE,
+  UPLOAD_COMPLETING_STALE_MS,
   UPLOAD_FREE_SPACE_MARGIN,
   UPLOAD_MAX_ACTIVE_SESSIONS_PER_USER,
   UPLOAD_MAX_CHUNK_SIZE,
@@ -43,6 +44,7 @@ import {
   mapUploadSession,
 } from 'src/dtos/upload-session.dto.js';
 import {
+  AssetStatus,
   DatabaseLock,
   ImmichWorker,
   JobName,
@@ -96,6 +98,7 @@ const UPLOAD_CHECK_CONCURRENCY = 16;
 const NO_HARD_LINK_ERRORS = ['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EMLINK'];
 const MESSAGE_EXISTS = 'exists';
 const MESSAGE_CHECKSUM_MISMATCH = 'checksum_mismatch';
+const MESSAGE_PARTIAL_GONE = 'partial_gone';
 
 const terminalStatuses = new Set([
   UploadSessionStatus.Completed,
@@ -107,6 +110,7 @@ const terminalStatuses = new Set([
 export class UploadSessionService extends BaseService {
   private activeWrites = new Set<string>();
   private hashes = new Map<string, HashState>();
+  private completing = new Set<string>();
 
   async getLibraries(auth: AuthDto): Promise<UploadLibraryResponseDto[]> {
     const libraries = await this.uploadSessionRepository.getWritableLibraries(auth.user.id);
@@ -328,21 +332,69 @@ export class UploadSessionService extends BaseService {
       return this.map(session, await this.getOffset(session));
     }
 
-    this.assertActive(session);
+    const staleBefore = new Date(Date.now() - UPLOAD_COMPLETING_STALE_MS);
+    const isStale =
+      session.status === UploadSessionStatus.Completing &&
+      !!session.tempPath &&
+      new Date(session.updatedAt).getTime() < staleBefore.getTime();
+    if (!isStale) {
+      this.assertActive(session);
+    }
+
     if (this.activeWrites.has(session.id)) {
       throw new ConflictException('A chunk is still being written for this upload');
     }
 
-    const completing = await this.uploadSessionRepository.updateIfStatus(session.id, UploadSessionStatus.Active, {
-      status: UploadSessionStatus.Completing,
-    });
+    if (this.completing.has(session.id)) {
+      throw new ConflictException('Upload is already being completed');
+    }
+
+    this.completing.add(session.id);
+    try {
+      return await this.completeSession(auth, session, isStale ? staleBefore : undefined);
+    } finally {
+      this.completing.delete(session.id);
+    }
+  }
+
+  private async completeSession(
+    auth: AuthDto,
+    session: UploadSession,
+    staleBefore?: Date,
+  ): Promise<UploadSessionResponseDto> {
+    const completing = staleBefore
+      ? await this.uploadSessionRepository.updateIfStatus(
+          session.id,
+          UploadSessionStatus.Completing,
+          { status: UploadSessionStatus.Completing },
+          staleBefore,
+        )
+      : await this.uploadSessionRepository.updateIfStatus(session.id, UploadSessionStatus.Active, {
+          status: UploadSessionStatus.Completing,
+        });
     if (!completing) {
       throw new ConflictException('Upload is already being completed');
     }
 
     const tempPath = session.tempPath as string;
     const size = Number(session.size);
-    const storedSize = await this.getTempSize(session);
+    let storedSize: number;
+    try {
+      storedSize = await this.getTempSize(session);
+    } catch (error) {
+      if (error instanceof HttpException && error.getStatus() === HttpStatus.GONE) {
+        await this.uploadSessionRepository.update(session.id, {
+          status: UploadSessionStatus.Failed,
+          outcome: UploadOutcome.Failed,
+          message: MESSAGE_PARTIAL_GONE,
+        });
+        this.hashes.delete(session.id);
+      } else {
+        await this.uploadSessionRepository.update(session.id, { status: UploadSessionStatus.Active });
+      }
+      throw error;
+    }
+
     if (storedSize !== size) {
       await this.uploadSessionRepository.update(session.id, { status: UploadSessionStatus.Active });
       throw new ConflictException({ message: 'Upload is incomplete', offset: storedSize });
@@ -378,11 +430,7 @@ export class UploadSessionService extends BaseService {
         return this.map(result, size);
       }
 
-      if (session.fileModifiedAt) {
-        await this.storageRepository.utimes(placed.target.realPath, new Date(), new Date(session.fileModifiedAt));
-      }
-
-      const assetId = await this.importAsset(library, placed.target);
+      const assetId = await this.finishPlacedFile(session, library, placed.target);
       const result = await this.uploadSessionRepository.update(session.id, {
         status: UploadSessionStatus.Completed,
         outcome: placed.outcome,
@@ -532,8 +580,9 @@ export class UploadSessionService extends BaseService {
 
   private async resolveTarget(library: WritableLibrary, input: string): Promise<UploadTarget> {
     const segments = parseUploadPath(input);
-    const realPath = await resolveSafePath(library.realRoot, segments.join('/'));
-    return this.toTarget(library, realPath);
+    const name = segments.at(-1) as string;
+    const realDirectory = await resolveSafePath(library.realRoot, segments.slice(0, -1).join('/'));
+    return this.toTarget(library, join(realDirectory, name));
   }
 
   private toTarget(library: WritableLibrary, realPath: string): UploadTarget {
@@ -675,6 +724,10 @@ export class UploadSessionService extends BaseService {
       await this.storageRepository.link(tempPath, targetPath);
     } catch (error) {
       if (isErrorCode(error, 'EEXIST')) {
+        if (await this.isSameFile(tempPath, targetPath)) {
+          await this.storageRepository.unlink(tempPath);
+          return true;
+        }
         return false;
       }
 
@@ -695,18 +748,45 @@ export class UploadSessionService extends BaseService {
     return true;
   }
 
+  private async isSameFile(tempPath: string, targetPath: string) {
+    const [tempStats, targetStats] = await Promise.all([
+      this.storageRepository.lstat(tempPath),
+      this.storageRepository.lstat(targetPath).catch(() => null),
+    ]);
+    return (
+      !!targetStats &&
+      targetStats.isFile() &&
+      tempStats.nlink > 1 &&
+      tempStats.dev === targetStats.dev &&
+      tempStats.ino === targetStats.ino
+    );
+  }
+
+  private async finishPlacedFile(session: UploadSession, library: WritableLibrary, target: UploadTarget) {
+    try {
+      if (session.fileModifiedAt) {
+        await this.storageRepository.utimes(target.realPath, new Date(), new Date(session.fileModifiedAt));
+      }
+      return await this.importAsset(library, target);
+    } catch (error) {
+      this.logger.warn(
+        `Upload ${session.id} was stored at ${target.relativePath} but not imported, the next library scan will import it: ${error}`,
+      );
+      return null;
+    }
+  }
+
   private async importAsset(library: WritableLibrary, target: UploadTarget) {
     const existing = await this.assetRepository.getByLibraryIdAndOriginalPath(library.id, target.assetPath);
     const stat = await this.storageRepository.stat(target.realPath);
 
     if (existing) {
-      if (existing.isOffline || existing.deletedAt) {
-        await this.assetRepository.updateAll([existing.id], {
-          isOffline: false,
-          deletedAt: null,
-          fileModifiedAt: stat.mtime,
-        });
-      }
+      const isTrashed = existing.status === AssetStatus.Trashed;
+      await this.assetRepository.updateAll([existing.id], {
+        fileModifiedAt: stat.mtime,
+        ...(existing.isOffline && { isOffline: false }),
+        ...(existing.isOffline && !isTrashed && { deletedAt: null }),
+      });
       await this.jobRepository.queue({ name: JobName.SidecarCheck, data: { id: existing.id, source: 'upload' } });
       return existing.id;
     }

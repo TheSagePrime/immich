@@ -1,11 +1,11 @@
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
+import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
-import { UPLOAD_SESSION_TTL_MS, UPLOAD_TEMP_DIR_NAME } from 'src/constants.js';
+import { UPLOAD_COMPLETING_STALE_MS, UPLOAD_SESSION_TTL_MS, UPLOAD_TEMP_DIR_NAME } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
@@ -213,6 +213,44 @@ describe(UploadSessionService.name, () => {
     expect(sha1(await readFile(join(root, 'resume.jpg')))).toBe(sha1(data));
   });
 
+  it('should finish a session that was left completing by a crash without a duplicate', async () => {
+    const { root, library, auth } = await setup();
+    const data = randomBytes(1000);
+
+    const session = await ctx.sut.create(auth, {
+      libraryId: library.id,
+      relativePath: 'crash.jpg',
+      size: data.length,
+      checksum: sha1(data),
+      duplicatePolicy: UploadDuplicatePolicy.KeepBoth,
+    });
+    await ctx.sut.writeChunk(auth, session.id, { offset: 0, contentLength: data.length }, Readable.from([data]));
+    const { tempPath } = await ctx.database
+      .selectFrom('upload_session')
+      .select('tempPath')
+      .where('id', '=', session.id)
+      .executeTakeFirstOrThrow();
+    await link(tempPath!, join(root, 'crash.jpg'));
+    await ctx.database.transaction().execute(async (trx) => {
+      await sql`SET LOCAL session_replication_role = replica`.execute(trx);
+      await trx
+        .updateTable('upload_session')
+        .set({
+          status: UploadSessionStatus.Completing,
+          updatedAt: new Date(Date.now() - UPLOAD_COMPLETING_STALE_MS * 2),
+        })
+        .where('id', '=', session.id)
+        .execute();
+    });
+
+    const result = await ctx.sut.complete(auth, session.id);
+
+    expect(result.result).toMatchObject({ outcome: UploadOutcome.Created, relativePath: 'crash.jpg' });
+    expect(await readdir(root)).toEqual(expect.not.arrayContaining(['crash (1).jpg']));
+    expect(sha1(await readFile(join(root, 'crash.jpg')))).toBe(sha1(data));
+    expect(await readdir(join(root, UPLOAD_TEMP_DIR_NAME))).toEqual([]);
+  });
+
   it('should refuse to complete a file with a wrong checksum', async () => {
     const { root, library, auth } = await setup();
     const data = randomBytes(100);
@@ -308,6 +346,21 @@ describe(UploadSessionService.name, () => {
         'Path must stay inside the root',
       );
       expect(await readdir(outside)).toEqual([]);
+    });
+
+    it('should never write through a symlink at the target path', async () => {
+      const { root, library, auth } = await setup();
+      const outside = await mkdtemp(join(tmpdir(), 'upload-session-outside-'));
+      roots.push(outside);
+      await writeFile(join(outside, 'target.jpg'), 'original');
+      await symlink(join(outside, 'target.jpg'), join(root, 'photo.jpg'));
+      const data = randomBytes(100);
+
+      const result = await ctx.upload(auth, library.id, 'photo.jpg', data);
+
+      expect(result.result).toMatchObject({ outcome: UploadOutcome.Renamed, relativePath: 'photo (1).jpg' });
+      expect(await readFile(join(outside, 'target.jpg'), 'utf8')).toBe('original');
+      expect(sha1(await readFile(join(root, 'photo (1).jpg')))).toBe(sha1(data));
     });
 
     it('should refuse a library that is not writable', async () => {

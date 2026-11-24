@@ -315,6 +315,7 @@ export const AV1_LEVELS: CodecLevel[] = [
 export const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
 export const UPLOAD_MAX_CHUNK_SIZE = 32 * 1024 * 1024;
 export const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+export const UPLOAD_COMPLETING_STALE_MS = 60 * 60 * 1000;
 export const UPLOAD_SESSION_EXPIRY_REFRESH_MS = 60 * 1000;
 export const UPLOAD_TERMINAL_SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const UPLOAD_TEMP_DIR_NAME = '.immich-upload-tmp';

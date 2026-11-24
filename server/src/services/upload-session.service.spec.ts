@@ -6,13 +6,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import {
+  UPLOAD_COMPLETING_STALE_MS,
   UPLOAD_MAX_ACTIVE_SESSIONS_PER_USER,
   UPLOAD_MAX_CHUNK_SIZE,
   UPLOAD_SESSION_TTL_MS,
   UPLOAD_TEMP_DIR_NAME,
 } from 'src/constants.js';
 import { UploadSession } from 'src/dtos/upload-session.dto.js';
-import { JobName, JobStatus, UploadDuplicatePolicy, UploadOutcome, UploadSessionStatus } from 'src/enum.js';
+import {
+  AssetStatus,
+  JobName,
+  JobStatus,
+  UploadDuplicatePolicy,
+  UploadOutcome,
+  UploadSessionStatus,
+} from 'src/enum.js';
 import { UploadSessionService } from 'src/services/upload-session.service.js';
 import { factory, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
@@ -540,6 +548,105 @@ describe(UploadSessionService.name, () => {
       expect(result.result?.assetId).toBe('offline-asset');
     });
 
+    it('should keep an offline asset the user trashed in the trash', async () => {
+      const { session } = setupComplete();
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue({
+        id: 'trashed-asset',
+        isOffline: true,
+        status: AssetStatus.Trashed,
+        deletedAt: new Date(),
+      } as never);
+
+      await sut.complete(auth, session.id);
+
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['trashed-asset'], {
+        isOffline: false,
+        fileModifiedAt: expect.any(Date),
+      });
+    });
+
+    it('should not restore an online asset the user trashed', async () => {
+      const { session } = setupComplete();
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue({
+        id: 'trashed-asset',
+        isOffline: false,
+        status: AssetStatus.Trashed,
+        deletedAt: new Date(),
+      } as never);
+
+      await sut.complete(auth, session.id);
+
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['trashed-asset'], { fileModifiedAt: expect.any(Date) });
+    });
+
+    it('should mark the session failed when the partial file is gone', async () => {
+      const { session } = setupComplete();
+      existing.delete(session.tempPath!);
+
+      await expect(sut.complete(auth, session.id)).rejects.toMatchObject({ status: 410 });
+
+      expect(mocks.uploadSession.update).toHaveBeenCalledWith(session.id, {
+        status: UploadSessionStatus.Failed,
+        outcome: UploadOutcome.Failed,
+        message: 'partial_gone',
+      });
+    });
+
+    it('should keep the session active when the partial file cannot be read', async () => {
+      const { session } = setupComplete();
+      mocks.storage.stat.mockRejectedValue(errorWithCode('EIO'));
+
+      await expect(sut.complete(auth, session.id)).rejects.toMatchObject({ code: 'EIO' });
+
+      expect(mocks.uploadSession.update).toHaveBeenCalledWith(session.id, { status: UploadSessionStatus.Active });
+      expect(mocks.uploadSession.update).not.toHaveBeenCalledWith(
+        session.id,
+        expect.objectContaining({ status: UploadSessionStatus.Failed }),
+      );
+    });
+
+    it('should refuse to take over a session that is still being completed', async () => {
+      const { session } = setupComplete({ status: UploadSessionStatus.Completing });
+
+      await expect(sut.complete(auth, session.id)).rejects.toBeInstanceOf(ConflictException);
+
+      expect(mocks.uploadSession.updateIfStatus).not.toHaveBeenCalled();
+      expect(mocks.storage.link).not.toHaveBeenCalled();
+    });
+
+    it('should take over a session that was left completing by a crash', async () => {
+      const { session } = setupComplete({
+        status: UploadSessionStatus.Completing,
+        updatedAt: new Date(Date.now() - UPLOAD_COMPLETING_STALE_MS - 1000),
+      });
+
+      const result = await sut.complete(auth, session.id);
+
+      expect(mocks.uploadSession.updateIfStatus).toHaveBeenCalledWith(
+        session.id,
+        UploadSessionStatus.Completing,
+        { status: UploadSessionStatus.Completing },
+        expect.any(Date),
+      );
+      expect(result.result?.outcome).toBe(UploadOutcome.Created);
+    });
+
+    it('should not rename a file that was already linked before a crash', async () => {
+      const { session } = setupComplete({
+        status: UploadSessionStatus.Completing,
+        updatedAt: new Date(Date.now() - UPLOAD_COMPLETING_STALE_MS - 1000),
+      });
+      const linked = { ...fileStats(3), ino: 42, nlink: 2, isFile: () => true } as Stats;
+      existing.set(session.tempPath!, linked);
+      existing.set(join(root, 'trip/photo.jpg'), linked);
+
+      const result = await sut.complete(auth, session.id);
+
+      expect(mocks.storage.link).toHaveBeenCalledTimes(1);
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(session.tempPath);
+      expect(result.result).toMatchObject({ outcome: UploadOutcome.Created, relativePath: 'trip/photo.jpg' });
+    });
+
     it('should reuse the asset when the library watcher imported it first', async () => {
       const { session } = setupComplete();
       mocks.asset.create.mockRejectedValue(new Error('duplicate key value violates unique constraint'));
@@ -551,6 +658,42 @@ describe(UploadSessionService.name, () => {
 
       expect(result.result?.assetId).toBe('watched-asset');
       expect(mocks.event.emit).not.toHaveBeenCalled();
+    });
+
+    it('should keep a placed file when importing it fails', async () => {
+      const { session } = setupComplete();
+      mocks.asset.create.mockRejectedValue(new Error('connection lost'));
+
+      const result = await sut.complete(auth, session.id);
+
+      expect(result.status).toBe(UploadSessionStatus.Completed);
+      expect(result.result).toMatchObject({ outcome: UploadOutcome.Created, relativePath: 'trip/photo.jpg' });
+      expect(result.result?.assetId).toBeUndefined();
+      expect(mocks.storage.unlink).toHaveBeenCalledWith(session.tempPath);
+      expect(mocks.storage.unlink).not.toHaveBeenCalledWith(join(root, 'trip/photo.jpg'));
+    });
+
+    it('should refuse a second complete call while the first one is running', async () => {
+      const { session } = setupComplete();
+      let release!: () => void;
+      mocks.crypto.hashFile.mockReturnValue(
+        new Promise((resolve) => {
+          release = () => resolve(sha1(Buffer.from('abc')));
+        }),
+      );
+
+      const first = sut.complete(auth, session.id);
+      await vi.waitFor(() => expect(mocks.crypto.hashFile).toHaveBeenCalled());
+      mocks.uploadSession.get.mockResolvedValue({
+        ...session,
+        status: UploadSessionStatus.Completing,
+        updatedAt: new Date(Date.now() - UPLOAD_COMPLETING_STALE_MS - 1000),
+      });
+
+      await expect(sut.complete(auth, session.id)).rejects.toBeInstanceOf(ConflictException);
+      release();
+      await expect(first).resolves.toMatchObject({ status: UploadSessionStatus.Completed });
+      expect(mocks.storage.link).toHaveBeenCalledTimes(1);
     });
 
     it('should use the hash computed while receiving the chunks', async () => {

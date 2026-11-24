@@ -1147,7 +1147,8 @@
     "unable_to_update_workflow": "Unable to update workflow",
     "unable_to_upload_file": "Unable to upload file",
     "upload_checksum_mismatch": "The file changed while it was uploading, try again",
-    "upload_file_exists": "A file with this name already exists"
+    "upload_file_exists": "A file with this name already exists",
+    "upload_partial_gone": "The partial upload was removed from the server, try again"
   },
   "errors_text": "Errors",
   "exclusion_pattern": "Exclusion pattern",
