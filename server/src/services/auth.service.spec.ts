@@ -609,6 +609,61 @@ describe(AuthService.name, () => {
 
       expect(mocks.sharedLink.getByKey).toHaveBeenCalledWith(buffer);
     });
+
+    describe('password protected', () => {
+      const user = UserFactory.create();
+      const sharedLink = { ...sharedLinkStub.valid, password: 'secret', user } as any;
+      const key = sharedLink.key.toString('base64url');
+      const token = Buffer.from(`${sharedLink.id}-secret (hashed)`).toString('base64');
+
+      beforeEach(() => {
+        mocks.sharedLink.getByKey.mockResolvedValue(sharedLink);
+      });
+
+      it('should require the password cookie', async () => {
+        await expect(
+          sut.authenticate({
+            headers: { 'x-immich-share-key': key },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          }),
+        ).rejects.toThrow('Password required');
+      });
+
+      it('should reject a cookie for another password', async () => {
+        const other = Buffer.from(`${sharedLink.id}-other (hashed)`).toString('base64');
+        await expect(
+          sut.authenticate({
+            headers: { 'x-immich-share-key': key, cookie: `immich_shared_link_token=${encodeURIComponent(other)}` },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          }),
+        ).rejects.toThrow('Password required');
+      });
+
+      it('should accept the password cookie', async () => {
+        await expect(
+          sut.authenticate({
+            headers: {
+              'x-immich-share-key': key,
+              cookie: `immich_shared_link_token=${encodeURIComponent(`other,${token}`)}`,
+            },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, uri: 'test' },
+          }),
+        ).resolves.toEqual({ user, sharedLink });
+      });
+
+      it('should allow routes that do not need the password', async () => {
+        await expect(
+          sut.authenticate({
+            headers: { 'x-immich-share-key': key },
+            queryParams: {},
+            metadata: { adminRoute: false, sharedLinkRoute: true, sharedLinkPasswordRequired: false, uri: 'test' },
+          }),
+        ).resolves.toEqual({ user, sharedLink });
+      });
+    });
   });
 
   describe('validate - shared link slug', () => {

@@ -163,6 +163,12 @@ describe('controllers', () => {
     expect(new Set(sharedLinkRoutes)).toEqual(SHARED_LINK_ROUTES);
   });
 
+  it('should only skip the shared link password on the shared link login', () => {
+    const routesWithoutPassword = routes.filter((route) => route.auth?.withoutSharedLinkPassword).map((route) => route.id);
+
+    expect(routesWithoutPassword).toEqual(['POST shared-links/login']);
+  });
+
   it('should only require admin access on expected routes outside /admin', () => {
     const adminRoutes = routes
       .filter((route) => route.auth?.admin && route.path !== 'admin' && !route.path.startsWith('admin/'))

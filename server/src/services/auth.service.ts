@@ -59,6 +59,7 @@ export type ValidateRequest = {
   queryParams: Record<string, string>;
   metadata: {
     sharedLinkRoute: boolean;
+    sharedLinkPasswordRequired?: boolean;
     adminRoute: boolean;
     /** `false` explicitly means no permission is required, which otherwise defaults to `all` */
     permission?: Permission | false;
@@ -304,6 +305,14 @@ export class AuthService extends BaseService {
     if (authDto.sharedLink && !sharedLinkRoute) {
       this.logger.warn(`Denied access to non-shared route: ${uri}`);
       throw new ForbiddenException('Forbidden');
+    }
+
+    if (
+      authDto.sharedLink?.password &&
+      metadata.sharedLinkPasswordRequired !== false &&
+      !this.hasSharedLinkPasswordToken(headers, authDto.sharedLink)
+    ) {
+      throw new UnauthorizedException('Password required');
     }
 
     if (
@@ -567,6 +576,15 @@ export class AuthService extends BaseService {
   private getCookieToken(headers: IncomingHttpHeaders): string | null {
     const cookies = parseCookie(headers.cookie || '');
     return cookies[ImmichCookie.AccessToken] || null;
+  }
+
+  private hasSharedLinkPasswordToken(headers: IncomingHttpHeaders, sharedLink: AuthSharedLink) {
+    const cookies = parseCookie(headers.cookie || '');
+    const tokens = cookies[ImmichCookie.SharedLinkToken]?.split(',') ?? [];
+    const expected = this.cryptoRepository
+      .hashSha256(`${sharedLink.id}-${sharedLink.password}`)
+      .toString('base64');
+    return tokens.includes(expected);
   }
 
   private getCookieOauthState(headers: IncomingHttpHeaders): string | null {
