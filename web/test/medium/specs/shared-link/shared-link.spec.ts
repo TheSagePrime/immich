@@ -174,7 +174,8 @@ test.describe('shared link', () => {
     await app.sharedLink.form.createButton.click();
 
     await expect.poll(() => api.createSharedLink.calls.length).toBe(1);
-    const [{ body }] = api.createSharedLink.calls;
-    expect(body.expiresAt ?? null).toBeNull();
+    expect(api.createSharedLink).toHaveBeenCalledWith({
+      body: expect.objectContaining({ type: SharedLinkType.Individual, assetIds: [asset.id], expiresAt: null }),
+    });
   });
 });
