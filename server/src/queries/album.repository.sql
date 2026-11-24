@@ -165,6 +165,35 @@ where
 group by
   "album_asset"."albumId"
 
+-- AlbumRepository.getChildAlbumCounts
+select
+  "child"."parentAlbumId" as "albumId",
+  count(*)::int as "childAlbumCount"
+from
+  "album" as "child"
+where
+  "child"."parentAlbumId" in ($1)
+  and "child"."deletedAt" is null
+  and exists (
+    select
+    from
+      "album_user" as "child_user"
+    where
+      "child_user"."albumId" = "child"."id"
+      and "child_user"."userId" = $2
+  )
+group by
+  "child"."parentAlbumId"
+
+-- AlbumRepository.getFolderAlbumIds
+select
+  "album"."id"
+from
+  "album"
+where
+  "album"."id" in ($1)
+  and "album"."folderPath" is not null
+
 -- AlbumRepository.getAll
 select
   "album".*,
@@ -240,6 +269,19 @@ where
         "shared_link"
       where
         "shared_link"."albumId" = "album"."id"
+    )
+  )
+  and (
+    "album"."parentAlbumId" is null
+    or not exists (
+      select
+      from
+        "album_user" as "parent_user"
+        inner join "album" as "parent" on "parent"."id" = "parent_user"."albumId"
+      where
+        "parent_user"."albumId" = "album"."parentAlbumId"
+        and "parent_user"."userId" = $3
+        and "parent"."deletedAt" is null
     )
   )
 order by

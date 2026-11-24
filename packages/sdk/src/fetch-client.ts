@@ -684,6 +684,10 @@ export type EmailNotificationsResponse = {
     /** Whether email notifications are enabled */
     enabled: boolean;
 };
+export type FolderAlbumsResponse = {
+    /** Whether every folder is mirrored as an album */
+    enabled: boolean;
+};
 export type FoldersResponse = {
     /** Whether folders are enabled */
     enabled: boolean;
@@ -741,6 +745,7 @@ export type UserPreferencesResponseDto = {
     cast: CastResponse;
     download: DownloadResponse;
     emailNotifications: EmailNotificationsResponse;
+    folderAlbums?: FolderAlbumsResponse;
     folders: FoldersResponse;
     memories: MemoriesResponse;
     navigation?: NavigationResponse;
@@ -773,6 +778,10 @@ export type EmailNotificationsUpdate = {
     /** Whether to receive email notifications for album updates */
     albumUpdate?: boolean;
     /** Whether email notifications are enabled */
+    enabled?: boolean;
+};
+export type FolderAlbumsUpdate = {
+    /** Whether every folder is mirrored as an album */
     enabled?: boolean;
 };
 export type FoldersUpdate = {
@@ -833,6 +842,7 @@ export type UserPreferencesUpdateDto = {
     cast?: CastUpdate;
     download?: DownloadUpdate;
     emailNotifications?: EmailNotificationsUpdate;
+    folderAlbums?: FolderAlbumsUpdate;
     folders?: FoldersUpdate;
     memories?: MemoriesUpdate;
     navigation?: NavigationUpdate;
@@ -890,6 +900,8 @@ export type AlbumResponseDto = {
     albumUsers: AlbumUserResponseDto[];
     /** Number of assets */
     assetCount: number;
+    /** Number of child albums available to the user */
+    childAlbumCount?: number;
     contributorCounts?: ContributorCountResponseDto[];
     /** Creation date */
     createdAt: string;
@@ -903,9 +915,13 @@ export type AlbumResponseDto = {
     id: string;
     /** Activity feed enabled */
     isActivityEnabled: boolean;
+    /** Whether the album mirrors a folder. Its name and assets are managed automatically. */
+    isFolderAlbum?: boolean;
     /** Last modified asset timestamp */
     lastModifiedAssetTimestamp?: string;
     order?: AssetOrder;
+    /** Parent folder album ID */
+    parentAlbumId?: string | null;
     /** Is shared album */
     shared: boolean;
     /** UTC representation of (local) start date (earliest asset) */
@@ -969,6 +985,22 @@ export type BulkIdResponseDto = {
     id: string;
     /** Whether operation succeeded */
     success: boolean;
+};
+export type AlbumFolderAncestorDto = {
+    /** Album name */
+    albumName: string;
+    /** Album ID */
+    id: string;
+};
+export type AlbumFolderResponseDto = {
+    /** Parent albums from the top-level album down to the direct parent, as far as the user can access them */
+    ancestors: AlbumFolderAncestorDto[];
+    /** Child albums available to the user, sorted by name */
+    children: AlbumResponseDto[];
+    /** Whether the album mirrors a folder */
+    isFolderAlbum: boolean;
+    /** Folder path relative to the parent of its root folder (owner only) */
+    path?: string;
 };
 export type MapMarkerResponseDto = {
     /** City name */
@@ -4665,12 +4697,13 @@ export function getUserStatisticsAdmin({ id, isFavorite, isTrashed, visibility }
 /**
  * List all albums
  */
-export function getAllAlbums({ assetId, id, isOwned, isShared, name }: {
+export function getAllAlbums({ assetId, id, isOwned, isShared, name, topLevel }: {
     assetId?: string;
     id?: string;
     isOwned?: boolean;
     isShared?: boolean;
     name?: string;
+    topLevel?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -4680,7 +4713,8 @@ export function getAllAlbums({ assetId, id, isOwned, isShared, name }: {
         id,
         isOwned,
         isShared,
-        name
+        name,
+        topLevel
     }))}`, {
         ...opts
     }));
@@ -4802,6 +4836,19 @@ export function addAssetsToAlbum({ id, bulkIdsDto }: {
         method: "PUT",
         body: bulkIdsDto
     })));
+}
+/**
+ * Retrieve the folder of an album
+ */
+export function getAlbumFolder({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AlbumFolderResponseDto;
+    }>(`/albums/${encodeURIComponent(id)}/folder`, {
+        ...opts
+    }));
 }
 /**
  * Retrieve album map markers
@@ -8992,7 +9039,8 @@ export enum ManualJobName {
     IntegrityChecksumMismatchRefresh = "integrity-checksum-mismatch-refresh",
     IntegrityMissingFilesDeleteAll = "integrity-missing-files-delete-all",
     IntegrityUntrackedFilesDeleteAll = "integrity-untracked-files-delete-all",
-    IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all"
+    IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all",
+    FolderAlbumSync = "folder-album-sync"
 }
 export enum QueueName {
     ThumbnailGeneration = "thumbnailGeneration",
@@ -9114,6 +9162,8 @@ export enum JobName {
     StorageTemplateMigrationSingle = "StorageTemplateMigrationSingle",
     TagCleanup = "TagCleanup",
     UploadSessionCleanup = "UploadSessionCleanup",
+    FolderAlbumSync = "FolderAlbumSync",
+    FolderAlbumSyncQueueAll = "FolderAlbumSyncQueueAll",
     VersionCheck = "VersionCheck",
     OcrQueueAll = "OcrQueueAll",
     Ocr = "Ocr",

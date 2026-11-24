@@ -2209,6 +2209,21 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "topLevel",
+            "required": false,
+            "in": "query",
+            "description": "Only return albums whose parent album is not available to the user (hides nested folder albums)",
+            "x-immich-history": [
+              {
+                "version": "v3",
+                "state": "Added"
+              }
+            ],
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2769,6 +2784,58 @@
         ],
         "x-immich-permission": "albumAsset.create",
         "x-immich-state": "Stable"
+      }
+    },
+    "/albums/{id}/folder": {
+      "get": {
+        "description": "Retrieve the parent albums (breadcrumbs) and the child albums of a folder album. Hand-made albums return no parents and no children.",
+        "operationId": "getAlbumFolder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumFolderResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve the folder of an album",
+        "tags": [
+          "Albums"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "album.read"
       }
     },
     "/albums/{id}/map-markers": {
@@ -21013,6 +21080,57 @@
         ],
         "type": "object"
       },
+      "AlbumFolderAncestorDto": {
+        "properties": {
+          "albumName": {
+            "description": "Album name",
+            "type": "string"
+          },
+          "id": {
+            "description": "Album ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "albumName",
+          "id"
+        ],
+        "type": "object"
+      },
+      "AlbumFolderResponseDto": {
+        "properties": {
+          "ancestors": {
+            "description": "Parent albums from the top-level album down to the direct parent, as far as the user can access them",
+            "items": {
+              "$ref": "#/components/schemas/AlbumFolderAncestorDto"
+            },
+            "type": "array"
+          },
+          "children": {
+            "description": "Child albums available to the user, sorted by name",
+            "items": {
+              "$ref": "#/components/schemas/AlbumResponseDto"
+            },
+            "type": "array"
+          },
+          "isFolderAlbum": {
+            "description": "Whether the album mirrors a folder",
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Folder path relative to the parent of its root folder (owner only)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ancestors",
+          "children",
+          "isFolderAlbum"
+        ],
+        "type": "object"
+      },
       "AlbumResponseDto": {
         "properties": {
           "albumName": {
@@ -21039,6 +21157,18 @@
             "maximum": 9007199254740991,
             "minimum": 0,
             "type": "integer"
+          },
+          "childAlbumCount": {
+            "description": "Number of child albums available to the user",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer",
+            "x-immich-history": [
+              {
+                "version": "v3",
+                "state": "Added"
+              }
+            ]
           },
           "contributorCounts": {
             "items": {
@@ -21085,6 +21215,16 @@
             "description": "Activity feed enabled",
             "type": "boolean"
           },
+          "isFolderAlbum": {
+            "description": "Whether the album mirrors a folder. Its name and assets are managed automatically.",
+            "type": "boolean",
+            "x-immich-history": [
+              {
+                "version": "v3",
+                "state": "Added"
+              }
+            ]
+          },
           "lastModifiedAssetTimestamp": {
             "description": "Last modified asset timestamp",
             "format": "date-time",
@@ -21092,6 +21232,19 @@
           },
           "order": {
             "$ref": "#/components/schemas/AssetOrder"
+          },
+          "parentAlbumId": {
+            "description": "Parent folder album ID",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string",
+            "x-immich-history": [
+              {
+                "version": "v3",
+                "state": "Added"
+              }
+            ]
           },
           "shared": {
             "description": "Is shared album",
@@ -23913,6 +24066,28 @@
         ],
         "type": "object"
       },
+      "FolderAlbumsResponse": {
+        "properties": {
+          "enabled": {
+            "description": "Whether every folder is mirrored as an album",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "FolderAlbumsUpdate": {
+        "description": "Folder album preferences",
+        "properties": {
+          "enabled": {
+            "description": "Whether every folder is mirrored as an album",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "FolderAssetResponseDto": {
         "properties": {
           "id": {
@@ -24504,6 +24679,8 @@
           "StorageTemplateMigrationSingle",
           "TagCleanup",
           "UploadSessionCleanup",
+          "FolderAlbumSync",
+          "FolderAlbumSyncQueueAll",
           "VersionCheck",
           "OcrQueueAll",
           "Ocr",
@@ -24878,7 +25055,8 @@
           "integrity-checksum-mismatch-refresh",
           "integrity-missing-files-delete-all",
           "integrity-untracked-files-delete-all",
-          "integrity-checksum-mismatch-delete-all"
+          "integrity-checksum-mismatch-delete-all",
+          "folder-album-sync"
         ],
         "type": "string"
       },
@@ -35722,6 +35900,9 @@
           "emailNotifications": {
             "$ref": "#/components/schemas/EmailNotificationsResponse"
           },
+          "folderAlbums": {
+            "$ref": "#/components/schemas/FolderAlbumsResponse"
+          },
           "folders": {
             "$ref": "#/components/schemas/FoldersResponse"
           },
@@ -35782,6 +35963,9 @@
           },
           "emailNotifications": {
             "$ref": "#/components/schemas/EmailNotificationsUpdate"
+          },
+          "folderAlbums": {
+            "$ref": "#/components/schemas/FolderAlbumsUpdate"
           },
           "folders": {
             "$ref": "#/components/schemas/FoldersUpdate"
