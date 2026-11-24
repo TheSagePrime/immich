@@ -42,6 +42,7 @@ import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { LoginAttemptRepository } from 'src/repositories/login-attempt.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { MapRepository } from 'src/repositories/map.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
@@ -263,6 +264,7 @@ export type ServiceOverrides = {
   integrityReport: IntegrityRepository;
   job: JobRepository;
   library: LibraryRepository;
+  loginAttempt: LoginAttemptRepository;
   logger: LoggingRepository;
   machineLearning: MachineLearningRepository;
   map: MapRepository;
@@ -355,6 +357,7 @@ export const getMocks = () => {
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
     library: automock(LibraryRepository, { strict: false }),
+    loginAttempt: automock(LoginAttemptRepository),
     machineLearning: automock(MachineLearningRepository, { args: [loggerMock], strict: false }),
     map: automock(MapRepository, { args: [undefined, undefined, { setContext: () => {} }] }),
     media: newMediaRepositoryMock(),
@@ -401,6 +404,10 @@ export const getMocks = () => {
 
   // every new user gets a cluster group, which is incidental to most tests
   mocks.clusterGroup.create.mockResolvedValue(ClusterGroupFactory.create());
+  mocks.loginAttempt.getLocked.mockResolvedValue([]);
+  mocks.loginAttempt.recordFailure.mockResolvedValue(1);
+  mocks.loginAttempt.lock.mockResolvedValue();
+  mocks.loginAttempt.reset.mockResolvedValue();
 
   return mocks;
 };
@@ -436,6 +443,7 @@ export const newTestService = <T extends BaseService>(
     overrides.integrityReport || (mocks.integrityReport as As<IntegrityRepository>),
     overrides.job || (mocks.job as As<JobRepository>),
     overrides.library || (mocks.library as As<LibraryRepository>),
+    overrides.loginAttempt || (mocks.loginAttempt as As<LoginAttemptRepository>),
     overrides.machineLearning || (mocks.machineLearning as As<MachineLearningRepository>),
     overrides.map || (mocks.map as As<MapRepository>),
     overrides.media || (mocks.media as As<MediaRepository>),

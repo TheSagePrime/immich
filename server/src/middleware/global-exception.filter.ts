@@ -6,6 +6,7 @@ import { ZodError } from 'zod';
 import { ImmichHeader } from 'src/enum.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { isHttpException, onRouteError } from 'src/utils/logger.js';
+import { TooManyRequestsException } from 'src/utils/rate-limit.js';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter<Error> {
@@ -28,6 +29,10 @@ export class GlobalExceptionFilter implements ExceptionFilter<Error> {
     }
 
     const { status, body } = this.fromError(error);
+
+    if (error instanceof TooManyRequestsException) {
+      res.header('Retry-After', String(error.retryAfterSeconds));
+    }
 
     res
       .header({

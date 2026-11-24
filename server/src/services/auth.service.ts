@@ -27,6 +27,13 @@ import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission 
 import { OAuthConfig, OAuthRawProfile } from 'src/repositories/oauth.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { isGranted } from 'src/utils/access.js';
+import {
+  LoginRateLimitConfig,
+  TooManyRequestsException,
+  getLockoutMinutes,
+  getRetryAfterSeconds,
+  normalizeClientIp,
+} from 'src/utils/rate-limit.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
 import { getUserAgentDetails } from 'src/utils/request.js';
 
@@ -37,6 +44,10 @@ export interface LoginDetails {
   deviceOS: string;
   appVersion: string | null;
 }
+
+type LoginAttemptKey = { key: string; maxFailures: number; isAccount: boolean };
+
+const LOGIN_RATE_LIMIT_MESSAGE = 'Too many failed login attempts, try again later';
 
 type OAuthClaimsConfig = Pick<
   SystemConfig['oauth'],
@@ -63,6 +74,10 @@ export class AuthService extends BaseService {
       throw new UnauthorizedException('Password login has been disabled');
     }
 
+    const { rateLimit } = config.passwordLogin;
+    const attemptKeys = rateLimit.enabled ? this.getLoginAttemptKeys(dto.email, details.clientIp, rateLimit) : [];
+    await this.requireLoginNotLocked(attemptKeys);
+
     const user = await this.userRepository.getByEmail(dto.email, { withPassword: true });
     // Always run bcrypt so response time is constant regardless of whether the email
     // is registered, preventing timing-based user enumeration.
@@ -70,10 +85,70 @@ export class AuthService extends BaseService {
 
     if (!user || !user.password || !isAuthenticated) {
       this.logger.warn(`Failed login attempt for user ${dto.email} from ip address ${details.clientIp}`);
+      await this.recordLoginFailure(attemptKeys, rateLimit);
       throw new UnauthorizedException('Incorrect email or password');
     }
 
+    for (const { key, isAccount } of attemptKeys) {
+      if (isAccount) {
+        await this.loginAttemptRepository.reset(key);
+      }
+    }
+
     return this.createLoginResponse(user, details);
+  }
+
+  private getLoginAttemptKeys(email: string, clientIp: string, config: LoginRateLimitConfig): LoginAttemptKey[] {
+    const hash = (value: string) => this.cryptoRepository.hashSha256(value).toString('hex');
+    const keys: LoginAttemptKey[] = [
+      { key: hash(`email:${email.trim().toLowerCase()}`), maxFailures: config.accountMaxFailures, isAccount: true },
+    ];
+
+    const ip = normalizeClientIp(clientIp);
+    if (config.ipMaxFailures > 0 && ip) {
+      keys.push({ key: hash(`ip:${ip}`), maxFailures: config.ipMaxFailures, isAccount: false });
+    }
+
+    return keys;
+  }
+
+  private async requireLoginNotLocked(keys: LoginAttemptKey[]) {
+    if (keys.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+    const locked = await this.loginAttemptRepository.getLocked(
+      keys.map(({ key }) => key),
+      now,
+    );
+    if (locked.length === 0) {
+      return;
+    }
+
+    const lockedUntil = Math.max(...locked.map((attempt) => new Date(attempt.lockedUntil!).getTime()));
+    throw new TooManyRequestsException(LOGIN_RATE_LIMIT_MESSAGE, getRetryAfterSeconds(new Date(lockedUntil), now));
+  }
+
+  private async recordLoginFailure(keys: LoginAttemptKey[], config: LoginRateLimitConfig) {
+    const now = new Date();
+    const resetBefore = DateTime.fromJSDate(now).minus({ minutes: config.windowMinutes }).toJSDate();
+    let lockedUntil: Date | undefined;
+
+    for (const { key, maxFailures } of keys) {
+      const failures = await this.loginAttemptRepository.recordFailure(key, now, resetBefore);
+      const minutes = getLockoutMinutes(failures, maxFailures, config);
+      if (minutes > 0) {
+        const until = DateTime.fromJSDate(now).plus({ minutes }).toJSDate();
+        await this.loginAttemptRepository.lock(key, until);
+        lockedUntil = lockedUntil && lockedUntil > until ? lockedUntil : until;
+      }
+    }
+
+    if (lockedUntil) {
+      this.logger.warn(`Password login locked until ${lockedUntil.toISOString()} after repeated failed attempts`);
+      throw new TooManyRequestsException(LOGIN_RATE_LIMIT_MESSAGE, getRetryAfterSeconds(lockedUntil, now));
+    }
   }
 
   async logout(auth: AuthDto, authType: AuthType): Promise<LogoutResponseDto> {

@@ -90,7 +90,7 @@ const CROSS_ORIGIN_STRIPPED_HEADERS = ['authorization', 'cookie', 'proxy-authori
 const DEFAULT_MAX_REDIRECTS = 5;
 const DEFAULT_TIMEOUT = 30_000;
 
-const parseIpv6 = (address: string): number[] | undefined => {
+export const parseIpv6 = (address: string): number[] | undefined => {
   if (isIP(address) !== 6) {
     return;
   }

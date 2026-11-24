@@ -22,6 +22,7 @@ import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { LoginAttemptRepository } from 'src/repositories/login-attempt.repository.js';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository.js';
 import { MapRepository } from 'src/repositories/map.repository.js';
 import { MediaRepository } from 'src/repositories/media.repository.js';
@@ -82,6 +83,7 @@ export const repositories = [
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
+  LoginAttemptRepository,
   LoggingRepository,
   MachineLearningRepository,
   MapRepository,

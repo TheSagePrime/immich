@@ -360,7 +360,35 @@ const AdminConfigSchemaWithVisibility = z
       })
       .meta({ id: 'AdminConfigPasskeyDto' }),
     passwordLogin: z
-      .object({ enabled: configBool.describe('Enabled').meta({ visibility: Public }) })
+      .object({
+        enabled: configBool.describe('Enabled').meta({ visibility: Public }),
+        rateLimit: z
+          .object({
+            enabled: configBool.describe('Whether failed password logins are rate limited'),
+            accountMaxFailures: z
+              .int()
+              .min(1)
+              .max(1000)
+              .describe('Failed logins for one email address before further attempts are locked'),
+            ipMaxFailures: z
+              .int()
+              .min(0)
+              .max(100_000)
+              .describe('Failed logins from one IP address before further attempts are locked (0 disables)'),
+            windowMinutes: z
+              .int()
+              .min(1)
+              .max(1440)
+              .describe('Minutes after the last failed login after which the failure count resets'),
+            lockoutMinutes: z.int().min(1).max(1440).describe('Length of the first lockout in minutes'),
+            maxLockoutMinutes: z
+              .int()
+              .min(1)
+              .max(10_080)
+              .describe('Upper limit in minutes for lockouts that double with every further failure'),
+          })
+          .meta({ id: 'AdminConfigPasswordLoginRateLimitDto' }),
+      })
       .meta({ id: 'AdminConfigPasswordLoginDto' }),
     storageTemplate: z
       .object({
@@ -732,6 +760,14 @@ export const defaults = Object.freeze<SystemConfig>({
   },
   passwordLogin: {
     enabled: true,
+    rateLimit: {
+      enabled: true,
+      accountMaxFailures: 5,
+      ipMaxFailures: 30,
+      windowMinutes: 15,
+      lockoutMinutes: 1,
+      maxLockoutMinutes: 60,
+    },
   },
   storageTemplate: {
     enabled: false,
