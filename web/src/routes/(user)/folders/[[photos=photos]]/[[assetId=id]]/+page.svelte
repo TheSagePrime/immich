@@ -23,6 +23,7 @@
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import type { Viewport } from '#lib/managers/timeline-manager/types.ts';
+  import { uploadDropTargetManager, type UploadDropTarget } from '#lib/managers/upload-drop-target-manager.svelte.ts';
   import { queryClient } from '#lib/queries/client.ts';
   import { folderViewQueryKey, getAssetsByOriginalPathQuery, getFolderSummaryQuery } from '#lib/queries/view.query.ts';
   import { Route } from '#lib/route.ts';
@@ -53,7 +54,7 @@
     sortFolderCards,
     type FolderSort,
   } from '#lib/utils/folder-sort.ts';
-  import { getFolderCrumbs, isSameOrInsidePath } from '#lib/utils/folder-utils.ts';
+  import { getFolderCrumbs, getFolderName, isSameOrInsidePath } from '#lib/utils/folder-utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { isAssetViewerRoute } from '#lib/utils/navigation.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
@@ -122,6 +123,40 @@
     }
     return [];
   });
+
+  const pageUploadTarget = $derived.by((): UploadDropTarget | undefined => {
+    if (data.view.mode === 'roots') {
+      return;
+    }
+
+    if (data.view.mode === 'folders') {
+      const { root } = data.view.location;
+      return { label: crumbs.at(-1)?.title ?? root.name, writable: root.writable, libraryId: root.id, destination: '' };
+    }
+
+    return {
+      label: crumbs.at(-1)?.title ?? getFolderName(data.view.folderPath),
+      writable,
+      folderPath: data.view.folderPath,
+      libraryId: summary?.libraryId,
+    };
+  });
+
+  const getCardUploadTarget = (path: string): UploadDropTarget | undefined => {
+    const card = cards.find((item) => item.path === path);
+    if (!card) {
+      return;
+    }
+
+    return {
+      label: card.label,
+      writable: card.writable && !!card.folderPath,
+      folderPath: card.folderPath,
+      libraryId: card.kind === 'folder' ? summary?.libraryId : undefined,
+    };
+  };
+
+  $effect(() => uploadDropTargetManager.register({ page: () => pageUploadTarget, card: getCardUploadTarget }));
 
   const selectedFolders = new SvelteSet<string>();
   let selectingFolders = $state(false);
@@ -534,7 +569,7 @@
       icon={mdiFolder}
       selectable={selectingFolders}
       selected={selectedFolders}
-      {dropTarget}
+      dropTarget={dropTarget ?? uploadDropTargetManager.hoveredCardPath}
       onClick={handleCardClick}
       onToggle={toggleCard}
       onMenu={openCardMenu}

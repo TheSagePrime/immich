@@ -49,6 +49,7 @@ export type FolderUploadItem = {
   batchId: string;
   duplicatePolicy: UploadDuplicatePolicy;
   relativePath: string;
+  targetLabel?: string;
   finalRelativePath?: string;
   size: number;
   bytesSent: number;
@@ -65,6 +66,7 @@ export type FolderUploadOptions = {
   destination: string;
   duplicatePolicy: UploadDuplicatePolicy;
   entries: FolderUploadEntry[];
+  targetLabel?: string;
 };
 
 export type FolderUploadDependencies = {
@@ -161,6 +163,7 @@ export class FolderUploadManager {
   speed = $state(0);
   unfinishedResumeCount = $state(0);
   isPanelOpen = $state(false);
+  targetLabels = $state<string[]>([]);
 
   readonly remainingSeconds = $derived(getRemainingSeconds(this.totalBytes - this.sentBytes, this.speed));
   readonly isActive = $derived(this.finishedFiles < this.totalFiles);
@@ -180,7 +183,7 @@ export class FolderUploadManager {
     }
   }
 
-  start({ libraryId, destination, duplicatePolicy, entries }: FolderUploadOptions) {
+  start({ libraryId, destination, duplicatePolicy, entries, targetLabel }: FolderUploadOptions) {
     const batchId = crypto.randomUUID();
     let added = 0;
     for (const { file, relativePath } of entries) {
@@ -202,6 +205,7 @@ export class FolderUploadManager {
         batchId,
         duplicatePolicy,
         relativePath: fullPath,
+        targetLabel,
         size: file.size,
         bytesSent: 0,
         state: FolderUploadState.Queued,
@@ -214,6 +218,7 @@ export class FolderUploadManager {
 
     if (added > 0) {
       this.isPanelOpen = true;
+      this.updateTargetLabels();
       this.startTicker();
     }
 
@@ -284,6 +289,7 @@ export class FolderUploadManager {
         this.forget(item);
       }
     }
+    this.updateTargetLabels();
   }
 
   async discardUnfinished() {
@@ -311,6 +317,7 @@ export class FolderUploadManager {
     this.speed = 0;
     this.speedTracker.reset();
     this.isPanelOpen = false;
+    this.targetLabels = [];
     this.stopTicker();
   }
 
@@ -329,6 +336,16 @@ export class FolderUploadManager {
     if (!this.isActive) {
       this.stopTicker();
     }
+  }
+
+  private updateTargetLabels() {
+    const labels: string[] = [];
+    for (const { targetLabel } of this.items.values()) {
+      if (targetLabel && !labels.includes(targetLabel)) {
+        labels.push(targetLabel);
+      }
+    }
+    this.targetLabels = labels;
   }
 
   private forget(item: FolderUploadItem) {

@@ -289,8 +289,19 @@ existing upload (`POST /assets`, used by the mobile apps) is unchanged.
 ### Using it
 
 - **Upload folder** in the top bar (shown only when the signed-in user owns at least one writable library) opens the
-  browser's folder picker. Dropping a folder anywhere on the page does the same; the drop overlay now covers the whole
-  window. Dropping plain files keeps the old behaviour.
+  browser's folder picker and then the upload dialog.
+- **Drag and drop works like a file manager and never asks for a destination.** While files or folders are dragged
+  over the window, the overlay names the target ("Drop to upload to: Goa"), and the progress panel shows it too
+  ("Uploading to: Goa"). Sub-folders of a dropped folder are kept.
+  - On an open folder of a writable library, the drop goes into that folder.
+  - On a folder card, the drop goes into that folder; the card is highlighted while dragging over it.
+  - Anywhere else (the Photos timeline, the Folders home, other pages) the drop goes into the root of the first
+    writable library.
+  - On a read-only folder or card the overlay turns red, says the folder is read-only and the drop is refused.
+  - Files that already exist at the target are skipped (the dialog's default). Unsupported files are left out and
+    counted in a short message; hidden files such as `.DS_Store` are left out silently.
+  - Album pages, the locked folder and shared links keep the official upload behaviour, and so does every page when
+    the user owns no writable library.
 - The dialog asks for the destination (library, then a folder inside it; new sub-folders can be added) and what to do
   when a file already exists: **skip** the new file, **keep both** (the new file is stored as `name (1).ext`,
   `name (2).ext`, ...) or **mark it as failed**. Before starting it shows how many files already exist there.

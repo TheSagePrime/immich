@@ -212,7 +212,7 @@ test.describe('folder upload', () => {
 
     const overlay = page.getByTestId('drop-overlay');
     await expect(overlay).toBeVisible();
-    await expect(overlay).toContainText('drop_files_or_folders_to_upload');
+    await expect(overlay).toContainText('drop_to_upload_to');
     const box = await overlay.boundingBox();
     const viewport = page.viewportSize()!;
     expect(box).toMatchObject({ x: 0, y: 0, width: viewport.width, height: viewport.height });
@@ -234,6 +234,6 @@ test.describe('folder upload', () => {
     const overlay = page.getByTestId('drop-overlay');
     await expect(overlay).toBeVisible();
     await expect(overlay).toContainText('drop_files_to_upload');
-    await expect(overlay).not.toContainText('drop_files_or_folders_to_upload');
+    await expect(overlay).not.toContainText('drop_to_upload_to');
   });
 });
