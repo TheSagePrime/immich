@@ -1,5 +1,5 @@
 <script lang="ts">
-  import VideoPlaybackResume from '#lib/components/asset-viewer/VideoPlaybackResume.svelte';
+  import VideoPlaybackResume from '../../../src/lib/components/asset-viewer/VideoPlaybackResume.svelte';
 
   type Props = {
     data: { video: HTMLVideoElement; assetId: string; fallbackDuration?: number };
