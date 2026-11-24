@@ -1,5 +1,4 @@
 <script lang="ts">
-  import VideoPlaybackResume from '#lib/components/asset-viewer/VideoPlaybackResume.svelte';
   import VideoRemoteViewer from '#lib/components/asset-viewer/VideoRemoteViewer.svelte';
   import FaceEditor from '#lib/components/asset-viewer/face-editor/FaceEditor.svelte';
   import { assetViewerFadeDuration } from '#lib/constants.ts';
@@ -9,16 +8,8 @@
   import { mediaCapabilitiesManager } from '#lib/managers/media-capabilities-manager.svelte.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getPublicConfigQuery } from '#lib/queries/config-public.query.ts';
-  import { getSubtitlesQuery } from '#lib/queries/video-library.query.ts';
   import { autoPlayVideo, lang, loopVideo as loopVideoPreference } from '#lib/stores/preferences.store.ts';
-  import {
-    getAssetHlsSessionUrl,
-    getAssetHlsUrl,
-    getAssetMediaUrl,
-    getAssetPlaybackUrl,
-    getAssetSubtitleUrl,
-  } from '#lib/utils.ts';
-  import { getSubtitleKind, getSubtitleLabel } from '#lib/utils/subtitles.ts';
+  import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '#lib/utils.ts';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
   import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';
   import {
@@ -29,18 +20,14 @@
     mdiFullscreenExit,
     mdiPause,
     mdiPlay,
-    mdiSubtitles,
-    mdiSubtitlesOutline,
     mdiVolumeHigh,
     mdiVolumeLow,
     mdiVolumeMedium,
     mdiVolumeMute,
   } from '@mdi/js';
-  import { createQuery } from '@tanstack/svelte-query';
   import 'hls-video-element';
   import type HlsVideoElement from 'hls-video-element';
   import Hls, { AbrController, Events, type FragLoadedData, type FragLoadingData, type HlsConfig } from 'hls.js';
-  import 'media-chrome/media-captions-button';
   import 'media-chrome/media-control-bar';
   import 'media-chrome/media-controller';
   import 'media-chrome/media-fullscreen-button';
@@ -49,7 +36,6 @@
   import 'media-chrome/media-playback-rate-button';
   import 'media-chrome/media-time-display';
   import 'media-chrome/media-volume-range';
-  import 'media-chrome/menu/media-captions-menu';
   import 'media-chrome/menu/media-playback-rate-menu';
   import 'media-chrome/menu/media-rendition-menu';
   import 'media-chrome/menu/media-settings-menu';
@@ -57,7 +43,7 @@
   import 'media-chrome/menu/media-settings-menu-item';
   import { onDestroy, onMount } from 'svelte';
   import { useSwipe, type SwipeCustomEvent } from 'svelte-gestures';
-  import { locale, t } from 'svelte-i18n';
+  import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import './immich-time-range';
 
@@ -91,14 +77,6 @@
     onVideoStarted = () => {},
     onClose = () => {},
   }: Props = $props();
-
-  const subtitlesQuery = createQuery(() => getSubtitlesQuery(assetId, authManager.params));
-  const subtitles = $derived(subtitlesQuery.data ?? []);
-  const subtitleTranslations = $derived({
-    forced: $t('subtitle_forced'),
-    hearingImpaired: $t('subtitle_hearing_impaired'),
-    fallback: $t('media_chrome.captions'),
-  });
 
   let videoPlayer: HTMLVideoElement | undefined = $state();
   let isLoading = $state(true);
@@ -376,17 +354,6 @@
   ]}
 />
 
-{#snippet subtitleTracks()}
-  {#each subtitles as subtitle (subtitle.name)}
-    <track
-      kind={getSubtitleKind(subtitle)}
-      src={getAssetSubtitleUrl(assetId, subtitle.name)}
-      srclang={subtitle.language ?? undefined}
-      label={getSubtitleLabel(subtitle, $locale ?? undefined, subtitleTranslations)}
-    />
-  {/each}
-{/snippet}
-
 {#if showVideo}
   <div
     transition:fade={{ duration: assetViewerFadeDuration }}
@@ -437,9 +404,7 @@
             }}
             onclose={onClose}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
-          >
-            {@render subtitleTracks()}
-          </hls-video>
+          ></hls-video>
         {:else}
           <video
             bind:this={videoPlayer}
@@ -465,9 +430,7 @@
             }}
             onclose={onClose}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
-          >
-            {@render subtitleTracks()}
-          </video>
+          ></video>
         {/if}
 
         {#if extendedControls}
@@ -481,16 +444,6 @@
                 <span slot="title">{$t('media_chrome.playback_rate')}</span>
               </media-playback-rate-menu>
             </media-settings-menu-item>
-            {#if subtitles.length > 0}
-              <media-settings-menu-item class="mx-1 rounded-lg p-1 ps-2">
-                {$t('media_chrome.captions')}
-                <Icon slot="suffix" icon={mdiChevronRight} class="m-2" />
-                <media-captions-menu slot="submenu" hidden>
-                  <Icon slot="back-icon" icon={mdiChevronLeft} class="m-2" />
-                  <span slot="title">{$t('media_chrome.captions')}</span>
-                </media-captions-menu>
-              </media-settings-menu-item>
-            {/if}
             {#if publicConfig.ffmpeg.realtime.enabled}
               <media-settings-menu-item class="mx-1 rounded-lg p-1 ps-2">
                 {$t('video_quality')}
@@ -517,13 +470,6 @@
 
             <span class="grow"></span>
 
-            {#if subtitles.length > 0}
-              <media-captions-button class="shrink-0 rounded-full p-2 outline-none" data-testid="video-captions-button">
-                <Icon slot="on" icon={mdiSubtitles} />
-                <Icon slot="off" icon={mdiSubtitlesOutline} />
-              </media-captions-button>
-            {/if}
-
             <div
               class="volume-wrapper shrink-0 rounded-full bg-light-100/0 transition-colors duration-400 hover:bg-light-100"
             >
@@ -547,13 +493,6 @@
           <immich-time-range class="h-8 w-full rounded-lg px-2 pb-3 outline-none"></immich-time-range>
         </div>
       </media-controller>
-
-      <VideoPlaybackResume
-        video={videoPlayer}
-        {assetId}
-        ready={hasLoadedMetadata}
-        fallbackDuration={asset.duration ? asset.duration / 1000 : undefined}
-      />
 
       {#if isLoading}
         <div class="absolute flex place-content-center place-items-center">

@@ -598,6 +598,19 @@ where
 order by
   "asset_file"."isEdited" desc
 
+-- AssetRepository.getVideoFolders
+select distinct
+  substring("asset"."originalPath", $1) as "folder"
+from
+  "asset"
+where
+  "asset"."ownerId" = $2::uuid
+  and "asset"."type" = $3
+  and "asset"."visibility" = $4
+  and "asset"."deletedAt" is null
+order by
+  "folder" asc
+
 -- AssetRepository.getForVideo
 select
   "asset"."originalPath",

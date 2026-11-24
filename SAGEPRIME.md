@@ -42,7 +42,6 @@ All fork migrations are newer than the last official `v3.4.2` migration,
 | `1795470129477-AddLibraryWritable`                      | foundation | Adds `library.writable boolean NOT NULL DEFAULT false`                                                          | Drops the column |
 | `1795560000000-AddAssetOwnerIdOriginalPathPatternIndex` | folders    | Adds the index `asset_ownerId_originalPath_pattern_idx` on `asset ("ownerId", "originalPath" text_pattern_ops)` | Drops the index  |
 | `1795600000000-AddUploadSessionTable`                   | uploads    | Adds the `upload_session` table (resumable folder uploads)                                                      | Drops the table  |
-| `1795700000000-AddAssetPlaybackPosition`                | video      | Adds the table `asset_playback_position` (`userId`, `assetId`, `position`, `duration`, `updatedAt`)             | Drops the table  |
 
 ## Rolling back to the official v3.4.2 images
 
@@ -288,49 +287,26 @@ already uploaded stay where they are and remain normal library files.
 
 ### What it adds
 
-- **Resume playback.** The web video player saves how far each user got in each video and continues there next time,
-  with a short "Resumed at mm:ss" notice and a "Start over" button. Positions are saved per user and per video, at
-  most every 10 seconds while playing, and right away on pause, when the viewer closes and when the page is left.
-  Videos shorter than a minute, positions in the first 5 seconds and positions near the end are not resumed, and a
-  video that plays to the end forgets its position. Shared-link viewers do not save positions.
-- **Sidecar subtitles.** `.srt` and `.vtt` files next to the original video file with the same base name are shown as
-  subtitle tracks in the web player (captions button and settings menu). An optional language and flags can follow the
-  base name, for example `movie.srt`, `movie.en.srt`, `movie.pt-BR.vtt`, `movie.en.forced.srt`, `movie.en.sdh.srt`.
-  SubRip files are converted to WebVTT on the fly; UTF-8, UTF-16 (with BOM) and Windows-1252 files are read.
 - **Videos page.** A "Videos" entry in the sidebar opens `/videos`: only videos, grouped by date like the timeline,
   with a folder tree (sidebar, breadcrumbs and sub-folder chips) to narrow the list to one folder and its sub-folders.
+- Resume playback and sidecar subtitles were planned for this group but dropped at the owner's request; the video player
+  is unchanged.
 
 ### API (all additive)
 
-| Endpoint                                        | Permission    | Shared links | What it does                                         |
-| ----------------------------------------------- | ------------- | ------------ | ---------------------------------------------------- |
-| `GET /assets/{id}/playback-position`            | `asset.read`  | no           | Saved position (`position: 0` when nothing is saved) |
-| `PUT /assets/{id}/playback-position`            | `asset.read`  | no           | Save `{ position, duration? }` in seconds            |
-| `DELETE /assets/{id}/playback-position`         | `asset.read`  | no           | Forget the saved position                            |
-| `GET /assets/{id}/subtitles`                    | `asset.view`  | yes          | List the sidecar subtitles of a video                |
-| `GET /assets/{id}/subtitles/{name}`             | `asset.view`  | yes          | One subtitle as `text/vtt`                           |
-| `GET /video-library/folders`                    | `folder.read` | no           | Folders that contain at least one video of the user  |
-| `GET /timeline/buckets`, `GET /timeline/bucket` | unchanged     | unchanged    | New optional `assetType` and `folder` query filters  |
+| Endpoint                                        | Permission    | Shared links | What it does                                        |
+| ----------------------------------------------- | ------------- | ------------ | --------------------------------------------------- |
+| `GET /video-library/folders`                    | `folder.read` | no           | Folders that contain at least one video of the user |
+| `GET /timeline/buckets`, `GET /timeline/bucket` | unchanged     | unchanged    | New optional `assetType` and `folder` query filters |
 
-Positions can be saved for any video the user can read (own, partner, shared album); each user has their own. The
-`folder` filter is refused for shared links. Existing endpoints and response fields are unchanged.
-
-### How subtitle files stay safe
-
-- Only the directory of the video's original file is read, never sub-folders or parent folders.
-- A file is listed and served only when its name starts with the video's base name and ends in `.srt` or `.vtt`. The
-  name is checked with the foundation's `parseSafeName` and resolved with `resolveSafePath`, so path separators, `..`,
-  NUL bytes and symbolic links that lead outside the video's folder are refused.
-- Files over 10 MB, and subtitles beyond the first 50 per video, are ignored. `STYLE` blocks are removed from WebVTT
-  files and SubRip formatting tags are stripped. Responses are `text/vtt` with `Cache-Control: private, no-cache`.
-- Access is checked exactly like the video itself (`asset.view`, shared links included).
+The `folder` filter is refused for shared links. Existing endpoints and response fields are unchanged.
 
 ### Settings and limits
 
-No settings or environment variables. The videos page uses the existing timeline endpoints, so it pages through large
-libraries the same way the timeline does; the folder filter can use the `asset_ownerId_originalPath_pattern_idx` index
-added by the folders group. The official mobile apps do not show sidecar subtitles or resume positions; their
-behaviour is unchanged.
+No settings, environment variables or migrations. The videos page uses the existing timeline endpoints, so it pages
+through large libraries the same way the timeline does; the folder filter can use the
+`asset_ownerId_originalPath_pattern_idx` index added by the folders group. The official mobile apps do not show the
+videos page; their behaviour is unchanged.
 
 ## Outbound network calls
 
@@ -341,5 +317,4 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
 - Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
   library's import path and the database.
-- Video library: none. Positions are stored in the database and subtitle files are read from the video's own
-  folder.
+- Video library: none. The videos page only reads the database.

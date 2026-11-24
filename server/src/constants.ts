@@ -218,7 +218,7 @@ export const endpointTags: Record<ApiTag, string> = {
   [ApiTag.Workflows]:
     'A workflow is a set of actions that run whenever a triggering event occurs. Workflows also can include filters to further limit execution.',
   [ApiTag.VideoLibrary]:
-    'Endpoints for browsing and watching videos: saved playback positions, sidecar subtitles and video folders.',
+    'Endpoints for browsing videos by folder.',
 };
 
 export const AUDIO_ENCODER: Record<AudioCodec, string> = {

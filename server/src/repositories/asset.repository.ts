@@ -1207,6 +1207,22 @@ export class AssetRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
+  async getVideoFolders(userId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('asset')
+      .select((eb) => eb.fn<string>('substring', ['asset.originalPath', eb.val('^(.*)/[^/]*$')]).as('folder'))
+      .distinct()
+      .where('asset.ownerId', '=', asUuid(userId))
+      .where('asset.type', '=', AssetType.Video)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .orderBy('folder', 'asc')
+      .execute();
+
+    return rows.map((row) => row.folder).filter((folder): folder is string => !!folder);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
   async getForVideo(id: string) {
     return this.db
       .selectFrom('asset')

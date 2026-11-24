@@ -27,7 +27,6 @@ import { AppRepository } from 'src/repositories/app.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
-import { AssetPlaybackRepository } from 'src/repositories/asset-playback.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { AuthChallengeRepository } from 'src/repositories/auth-challenge.repository.js';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository.js';
@@ -251,7 +250,6 @@ export type ServiceOverrides = {
   assetEdit: AssetEditRepository;
   assetFile: AssetFileRepository;
   assetJob: AssetJobRepository;
-  assetPlayback: AssetPlaybackRepository;
   authChallenge: AuthChallengeRepository;
   clusterGroup: ClusterGroupRepository;
   config: ConfigRepository;
@@ -343,7 +341,6 @@ export const getMocks = () => {
     assetEdit: automock(AssetEditRepository),
     assetFile: automock(AssetFileRepository),
     assetJob: automock(AssetJobRepository),
-    assetPlayback: automock(AssetPlaybackRepository),
     authChallenge: automock(AuthChallengeRepository),
     clusterGroup: automock(ClusterGroupRepository),
     app: automock(AppRepository, { strict: false }),
@@ -424,7 +421,6 @@ export const newTestService = <T extends BaseService>(
     overrides.assetEdit || (mocks.assetEdit as As<AssetEditRepository>),
     overrides.assetFile || (mocks.assetFile as As<AssetFileRepository>),
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
-    overrides.assetPlayback || (mocks.assetPlayback as As<AssetPlaybackRepository>),
     overrides.authChallenge || (mocks.authChallenge as As<AuthChallengeRepository>),
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),
     overrides.config || (mocks.config as As<ConfigRepository> as ConfigRepository),
