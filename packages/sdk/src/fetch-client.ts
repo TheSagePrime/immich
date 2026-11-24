@@ -1466,6 +1466,35 @@ export type AssetOcrResponseDto = {
     /** Normalized y coordinate of box corner 4 (0-1) */
     y4: number;
 };
+export type PlaybackPositionResponseDto = {
+    /** Asset ID */
+    assetId: string;
+    /** Duration of the video in seconds when the position was saved */
+    duration: number | null;
+    /** Saved playback position in seconds (0 when none saved) */
+    position: number;
+    /** When the position was saved (null when none saved) */
+    updatedAt: string | null;
+};
+export type PlaybackPositionUpdateDto = {
+    /** Duration of the video in seconds, as seen by the player */
+    duration?: number;
+    /** Playback position in seconds */
+    position: number;
+};
+export type SubtitleResponseDto = {
+    /** The file name marks the subtitle as forced */
+    forced: boolean;
+    format: SubtitleFormat;
+    /** The file name marks the subtitle as SDH / hearing impaired */
+    hearingImpaired: boolean;
+    /** Extra text from the file name besides the language, if any */
+    label: string | null;
+    /** BCP 47 language tag parsed from the file name, if any */
+    language: string | null;
+    /** File name of the subtitle, used to fetch it */
+    name: string;
+};
 export type SignUpDto = {
     /** User email */
     email: string;
@@ -5313,6 +5342,80 @@ export function downloadAsset({ edited, id, key, slug }: {
     }));
 }
 /**
+ * Clear playback position
+ */
+export function deletePlaybackPosition({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/playback-position`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get playback position
+ */
+export function getPlaybackPosition({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PlaybackPositionResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/playback-position`, {
+        ...opts
+    }));
+}
+/**
+ * Save playback position
+ */
+export function updatePlaybackPosition({ id, playbackPositionUpdateDto }: {
+    id: string;
+    playbackPositionUpdateDto: PlaybackPositionUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PlaybackPositionResponseDto;
+    }>(`/assets/${encodeURIComponent(id)}/playback-position`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: playbackPositionUpdateDto
+    })));
+}
+/**
+ * List sidecar subtitles
+ */
+export function getSubtitles({ id, key, slug }: {
+    id: string;
+    key?: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SubtitleResponseDto[];
+    }>(`/assets/${encodeURIComponent(id)}/subtitles${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get sidecar subtitle
+ */
+export function getSubtitle({ id, key, name, slug }: {
+    id: string;
+    key?: string;
+    name: string;
+    slug?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/assets/${encodeURIComponent(id)}/subtitles/${encodeURIComponent(name)}${QS.query(QS.explode({
+        key,
+        slug
+    }))}`, {
+        ...opts
+    }));
+}
+/**
  * View asset thumbnail
  */
 export function viewAsset({ edited, id, key, size, slug }: {
@@ -7973,9 +8076,11 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order, orderBy, personId, slug, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBucket({ albumId, assetType, bbox, folder, isFavorite, isTrashed, key, order, orderBy, personId, slug, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withStacked }: {
     albumId?: string;
+    assetType?: AssetTypeEnum;
     bbox?: string;
+    folder?: string;
     isFavorite?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -7996,7 +8101,9 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
         data: TimeBucketAssetResponseDto;
     }>(`/timeline/bucket${QS.query(QS.explode({
         albumId,
+        assetType,
         bbox,
+        folder,
         isFavorite,
         isTrashed,
         key,
@@ -8018,9 +8125,11 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, order, orderBy, personId, slug, tagId, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBuckets({ albumId, assetType, bbox, folder, isFavorite, isTrashed, key, order, orderBy, personId, slug, tagId, userId, visibility, withCoordinates, withPartners, withStacked }: {
     albumId?: string;
+    assetType?: AssetTypeEnum;
     bbox?: string;
+    folder?: string;
     isFavorite?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -8040,7 +8149,9 @@ export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, orde
         data: TimeBucketsResponseDto[];
     }>(`/timeline/buckets${QS.query(QS.explode({
         albumId,
+        assetType,
         bbox,
+        folder,
         isFavorite,
         isTrashed,
         key,
@@ -8410,6 +8521,17 @@ export function getProfileImage({ id }: {
         status: 200;
         data: Blob;
     }>(`/users/${encodeURIComponent(id)}/profile-image`, {
+        ...opts
+    }));
+}
+/**
+ * List video folders
+ */
+export function getVideoFolders(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: string[];
+    }>("/video-library/folders", {
         ...opts
     }));
 }
@@ -8965,6 +9087,10 @@ export enum AssetEditAction {
 export enum MirrorAxis {
     Horizontal = "horizontal",
     Vertical = "vertical"
+}
+export enum SubtitleFormat {
+    Srt = "srt",
+    Vtt = "vtt"
 }
 export enum AssetMediaSize {
     Original = "original",

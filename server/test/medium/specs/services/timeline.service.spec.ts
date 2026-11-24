@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { AssetOrderBy, AssetVisibility, SharedLinkType } from 'src/enum.js';
+import { AssetOrderBy, AssetType, AssetVisibility, SharedLinkType } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -114,6 +114,59 @@ describe(TimelineService.name, () => {
       const response = sut.getTimeBuckets(auth, {});
       await expect(response).rejects.toBeInstanceOf(BadRequestException);
       await expect(response).rejects.toThrow('Not found or no timeline.read access');
+    });
+
+    it('should filter by asset type and folder', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+      const assets = [
+        { type: AssetType.Video, originalPath: '/media/movies/a.mp4', localDateTime: new Date('1970-01-05') },
+        { type: AssetType.Video, originalPath: '/media/movies/2024/b.mp4', localDateTime: new Date('1970-02-05') },
+        { type: AssetType.Video, originalPath: '/media/movies_old/c.mp4', localDateTime: new Date('1970-03-05') },
+        { type: AssetType.Image, originalPath: '/media/movies/d.jpg', localDateTime: new Date('1970-01-06') },
+      ];
+      const ids: string[] = [];
+      for (const dto of assets) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, ...dto });
+        await ctx.newExif({ assetId: asset.id, make: 'Canon' });
+        ids.push(asset.id);
+      }
+
+      await expect(sut.getTimeBuckets(auth, { assetType: AssetType.Video })).resolves.toEqual([
+        { count: 1, timeBucket: '1970-03-01' },
+        { count: 1, timeBucket: '1970-02-01' },
+        { count: 1, timeBucket: '1970-01-01' },
+      ]);
+      await expect(sut.getTimeBuckets(auth, { assetType: AssetType.Video, folder: '/media/movies' })).resolves.toEqual([
+        { count: 1, timeBucket: '1970-02-01' },
+        { count: 1, timeBucket: '1970-01-01' },
+      ]);
+      await expect(sut.getTimeBuckets(auth, { folder: '/media/movies/' })).resolves.toEqual([
+        { count: 1, timeBucket: '1970-02-01' },
+        { count: 2, timeBucket: '1970-01-01' },
+      ]);
+
+      const bucket = JSON.parse(
+        await sut.getTimeBucket(auth, {
+          timeBucket: '1970-01-01',
+          assetType: AssetType.Video,
+          folder: '/media/movies',
+        }),
+      );
+      expect(bucket.id).toEqual([ids[0]]);
+    });
+
+    it('should treat folder wildcards literally', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await ctx.newAsset({ ownerId: user.id, originalPath: '/media/a_b/x.mp4', localDateTime: new Date('1970-01-05') });
+      await ctx.newAsset({ ownerId: user.id, originalPath: '/media/axb/y.mp4', localDateTime: new Date('1970-01-05') });
+
+      await expect(sut.getTimeBuckets(factory.auth({ user }), { folder: '/media/a_b' })).resolves.toEqual([
+        { count: 1, timeBucket: '1970-01-01' },
+      ]);
+      await expect(sut.getTimeBuckets(factory.auth({ user }), { folder: '/media/%' })).resolves.toEqual([]);
     });
   });
 

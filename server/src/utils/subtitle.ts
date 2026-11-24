@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { basename, dirname, extname } from 'node:path';
 import { SubtitleFormat, SubtitleResponseDto } from 'src/dtos/video-library.dto.js';
 import { parseSafeName, resolveSafePath } from 'src/utils/safe-path.js';
@@ -61,7 +61,11 @@ export const describeSubtitle = ({ name, format, suffix }: SubtitleCandidate): S
   let hearingImpaired = false;
   const labelTokens: string[] = [];
 
-  for (const token of suffix.split('.').filter(Boolean)) {
+  for (const token of suffix.split('.')) {
+    if (!token) {
+      continue;
+    }
+
     const normalized = token.toLowerCase();
     if (FORCED_FLAGS.has(normalized)) {
       forced = true;
@@ -109,10 +113,9 @@ const resolveSubtitleFile = async (directory: string, name: string) => {
 };
 
 const isServable = (directory: string, name: string) =>
-  resolveSubtitleFile(directory, name).then(
-    () => true,
-    () => false,
-  );
+  resolveSubtitleFile(directory, name)
+    .then(() => true)
+    .catch(() => false);
 
 export const findSidecarSubtitles = async (videoPath: string): Promise<SubtitleResponseDto[]> => {
   const directory = dirname(videoPath);
@@ -162,14 +165,15 @@ export const decodeSubtitle = (buffer: Buffer): string => {
 const TIMESTAMP_PATTERN = /(?:(\d{1,3}):)?(\d{1,2}):(\d{1,2})(?:[,.](\d{1,3}))?/;
 const TIMING_PATTERN = new RegExp(String.raw`^\s*(${TIMESTAMP_PATTERN.source})\s*-->\s*(${TIMESTAMP_PATTERN.source})`);
 
+const padTwo = (part: string) => part.padStart(2, '0');
+
 const formatTimestamp = (value: string) => {
   const match = TIMESTAMP_PATTERN.exec(value);
   if (!match) {
     return null;
   }
   const [, hours = '0', minutes, seconds, fraction = '0'] = match;
-  const pad = (part: string, length: number) => part.padStart(length, '0');
-  return `${pad(hours, 2)}:${pad(minutes, 2)}:${pad(seconds, 2)}.${fraction.padEnd(3, '0')}`;
+  return `${padTwo(hours)}:${padTwo(minutes)}:${padTwo(seconds)}.${fraction.padEnd(3, '0')}`;
 };
 
 const convertTimingLine = (line: string): string | null => {
@@ -188,7 +192,7 @@ const cleanCueText = (line: string) =>
     .replaceAll(/<\/?font[^>]*>/gi, '')
     .replaceAll('-->', '->');
 
-const normalizeNewlines = (text: string) => text.replace(/^﻿/, '').replaceAll(/\r\n?/g, '\n');
+const normalizeNewlines = (text: string) => text.replace(/^\u{FEFF}/u, '').replaceAll(/\r\n?/g, '\n');
 
 export const srtToVtt = (input: string): string => {
   const cues: string[] = [];

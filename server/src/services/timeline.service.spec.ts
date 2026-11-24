@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { AssetVisibility } from 'src/enum.js';
+import { AssetType, AssetVisibility } from 'src/enum.js';
 import { TimelineService } from 'src/services/timeline.service.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
@@ -25,6 +25,24 @@ describe(TimelineService.name, () => {
         },
         authStub.admin,
       );
+    });
+
+    it('should pass the type and folder filters to the repository', async () => {
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
+      await sut.getTimeBuckets(authStub.admin, { assetType: AssetType.Video, folder: '/videos' });
+
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        { userIds: [authStub.admin.user.id], assetType: AssetType.Video, folder: '/videos' },
+        authStub.admin,
+      );
+    });
+
+    it('should not allow the folder filter for shared links', async () => {
+      await expect(sut.getTimeBuckets(authStub.adminSharedLink, { folder: '/videos' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mocks.asset.getTimeBuckets).not.toHaveBeenCalled();
     });
 
     it('should pass bbox options to repository when all bbox fields are provided', async () => {

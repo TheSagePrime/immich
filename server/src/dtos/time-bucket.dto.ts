@@ -30,7 +30,7 @@ const TimeBucketQueryBaseSchema = z
       'Filter by asset visibility status (ARCHIVE, TIMELINE, HIDDEN, LOCKED)',
     ),
     withCoordinates: stringToBool.optional().describe('Include location data in the response'),
-    type: AssetTypeSchema.optional().describe('Filter by asset type (for example VIDEO for videos only)'),
+    assetType: AssetTypeSchema.optional().describe('Filter by asset type (for example VIDEO for videos only)'),
     folder: z
       .string()
       .min(1)
