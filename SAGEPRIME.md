@@ -335,12 +335,20 @@ the SMTP server, the database, Redis and the maintenance health check on localho
   thumbnails stay visible). It also covers asset-file downloads, person thumbnails, profile images and album or
   timeline download info.
 - Gaps found and fixed:
+  - the password of a password protected shared link only guarded `GET /shared-links/me`: anyone with the link's
+    key could load the thumbnails, originals, videos and downloads of that link without the password. Every
+    shared-link route now answers `401 Password required` for a password protected link unless the request carries
+    the `immich_shared_link_token` cookie that `POST /shared-links/login` sets after the right password (the web
+    share page already sends it). Only `POST /shared-links/login` itself works without it. Casting a password
+    protected share to a Chromecast does not work any more, because the cast device does not have the cookie;
   - an asset that was shared with an individual shared link and later moved to the locked folder was still served to
     that link (thumbnail, original, metadata, and listed in `GET /shared-links/me`). Locked assets are now excluded
     from shared-link access and from the assets of a link;
   - `GET /assets/:id/video/stream/:sessionId/...` did not check that the streaming session belongs to the asset in
     the URL, so someone with access to one asset could ask for the segments of another streaming session of the same
     owner if they knew its random id. The session must now belong to that asset (also for ending a session).
+- File routes keep the upstream behaviour of answering `404` instead of `400` when access is denied, so they do not
+  reveal whether an asset exists.
 - By design (unchanged): any signed-in user can load any user's profile image, and a shared link key in the request
   replaces the session of a signed-in user for that request.
 
