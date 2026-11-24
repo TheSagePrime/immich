@@ -98,6 +98,7 @@ export const Route = {
   trash: () => '/trash',
   viewTrashedAsset: ({ id }: { id: string }) => `/trash/photos/${id}`,
   recentlyAdded: () => '/recently-added',
+  videos: (params?: { path?: string }) => '/videos' + asQueryString(params),
 
   // search
   search: (dto?: MetadataSearchDto | SmartSearchDto) => {

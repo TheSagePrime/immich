@@ -28,6 +28,7 @@ import {
 import {
   AssetOrder,
   AssetOrderBy,
+  AssetTypeEnum,
   AssetVisibility,
   getAssetInfo,
   getTimeBuckets,
@@ -667,6 +668,8 @@ export class TimelineManager extends VirtualScrollManager {
       isMismatched(this.#options.isFavorite, asset.isFavorite) ||
       isMismatched(this.#options.isTrashed, asset.isTrashed) ||
       (this.#options.tagId && asset.tags && !asset.tags.includes(this.#options.tagId)) ||
+      (this.#options.assetType === AssetTypeEnum.Video && !asset.isVideo) ||
+      (this.#options.assetType === AssetTypeEnum.Image && !asset.isImage) ||
       (this.#options.assetFilter !== undefined && !this.#options.assetFilter.has(asset.id))
     );
   }
@@ -675,7 +678,7 @@ export class TimelineManager extends VirtualScrollManager {
     if (this.isExcluded(asset)) {
       return false;
     }
-    if (this.#options.albumId || this.#options.personId || this.#options.timelineAlbumId) {
+    if (this.#options.albumId || this.#options.personId || this.#options.timelineAlbumId || this.#options.folder) {
       return false;
     }
     if (this.#options.userId && !this.#options.withPartners && asset.ownerId !== this.#options.userId) {

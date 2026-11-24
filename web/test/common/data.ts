@@ -4,6 +4,7 @@ import { SeededRandom } from '#test/common/helpers.ts';
 import { payload } from '#test/common/payloads.ts';
 import type { ResponseOf } from '#test/common/types.ts';
 import { MockUploadSessions } from '#test/common/upload-sessions.ts';
+import { isInFolder, VideoLibraryData } from '#test/common/video-library.ts';
 import {
   AssetOrder,
   AssetTypeEnum,
@@ -45,6 +46,8 @@ export type TimelineFilter = {
   isTrashed?: boolean;
   visibility?: AssetVisibility;
   order?: AssetOrder;
+  assetType?: AssetTypeEnum;
+  folder?: string;
 };
 
 export type MemoryFilter = {
@@ -96,6 +99,7 @@ export class MockData {
   private readonly activities = new Map<string, ActivityResponseDto>();
   private readonly libraries = new Map<string, LibraryResponseDto>();
   readonly uploads = new MockUploadSessions(() => this.libraryList());
+  readonly videoLibrary = new VideoLibraryData(this);
 
   getPreferences() {
     return this.preferences;
@@ -179,7 +183,9 @@ export class MockData {
             ? !hiddenVisibilities.has(asset.visibility)
             : asset.visibility === filter.visibility) &&
           asset.isTrashed === isTrashed &&
-          (filter.isFavorite === undefined || asset.isFavorite === filter.isFavorite),
+          (filter.isFavorite === undefined || asset.isFavorite === filter.isFavorite) &&
+          (filter.assetType === undefined || asset.type === filter.assetType) &&
+          (filter.folder === undefined || isInFolder(asset.originalPath, filter.folder)),
       )
       .sort((a, b) => direction * a.fileCreatedAt.localeCompare(b.fileCreatedAt));
   }

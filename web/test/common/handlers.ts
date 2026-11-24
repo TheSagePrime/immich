@@ -3,6 +3,7 @@ import { factory } from '#test/common/factories.ts';
 import { createFolderHandlers } from '#test/common/folders.ts';
 import { fromBase64, minimalMp4, placeholderImage } from '#test/common/helpers.ts';
 import type { Handlers } from '#test/common/types.ts';
+import { createVideoLibraryHandlers } from '#test/common/video-library.ts';
 import { AssetUploadAction } from '@immich/sdk';
 
 const notFound = { status: 404, json: { message: 'Not found', statusCode: 404 } };
@@ -195,6 +196,7 @@ export const createHandlers = (data: MockData): Handlers => {
     }),
 
     playAssetVideo: () => ({ body: minimalMp4, contentType: 'video/mp4' }),
+    ...createVideoLibraryHandlers(data),
     viewAsset: ({ params }) => media(params.id),
     downloadAsset: ({ params }) => media(params.id),
     ...createFolderHandlers(data.folders),

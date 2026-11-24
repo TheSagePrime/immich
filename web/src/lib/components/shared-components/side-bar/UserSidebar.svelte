@@ -35,6 +35,8 @@
     mdiTrashCan,
     mdiTrashCanOutline,
     mdiUploadOutline,
+    mdiVideo,
+    mdiVideoOutline,
   } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
@@ -74,6 +76,8 @@
   <NavbarGroup title={$t('library')} size="tiny" />
 
   <NavbarItem title={$t('favorites')} href={Route.favorites()} icon={mdiHeartOutline} activeIcon={mdiHeart} />
+
+  <NavbarItem title={$t('videos')} href={Route.videos()} icon={mdiVideoOutline} activeIcon={mdiVideo} />
 
   <NavbarItem
     title={$t('albums')}

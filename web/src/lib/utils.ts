@@ -251,6 +251,10 @@ export const getAssetHlsSessionUrl = (id: string, sessionId: string) => {
   return createUrl(`/assets/${id}/video/stream/${sessionId}`, authManager.params);
 };
 
+export const getAssetSubtitleUrl = (id: string, name: string) => {
+  return createUrl(`/assets/${id}/subtitles/${encodeURIComponent(name)}`, authManager.params);
+};
+
 export const getProfileImageUrl = (user: UserResponseDto) =>
   createUrl(getUserProfileImagePath(user.id), { updatedAt: user.profileChangedAt });
 
