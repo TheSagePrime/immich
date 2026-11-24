@@ -38,6 +38,7 @@ import { DatabaseRepository } from 'src/repositories/database.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FolderAlbumRepository } from 'src/repositories/folder-album.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -542,6 +543,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case SyncRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
+    case FolderAlbumRepository:
     case UploadSessionRepository:
     case UserRepository:
     case VersionHistoryRepository:
@@ -612,6 +614,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case SyncRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
+    case FolderAlbumRepository:
     case UploadSessionRepository:
     case UserRepository:
     case VersionHistoryRepository:

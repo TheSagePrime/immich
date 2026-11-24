@@ -278,6 +278,7 @@ export class QueueService extends BaseService {
         { name: JobName.AuthChallengeCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.UploadSessionCleanup },
+        { name: JobName.FolderAlbumSyncQueueAll, data: { full: true } },
         { name: JobName.AuditTableCleanup },
       );
     }

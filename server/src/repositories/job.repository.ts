@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { JobType, JobsOptions, Queue, Worker } from 'bullmq';
 import { setTimeout } from 'node:timers/promises';
+import { FOLDER_ALBUM_SYNC_DELAY_MS } from 'src/constants.js';
 import { JobConfig } from 'src/decorators.js';
 import { QueueJobResponseDto, QueueJobSearchDto } from 'src/dtos/queue.dto.js';
 import { ImmichWorker, JobName, JobStatus, MetadataKey, QueueCleanType, QueueJobStatus, QueueName } from 'src/enum.js';
@@ -280,6 +281,15 @@ export class JobRepository {
       }
       case JobName.DatabaseBackup: {
         return { deduplication: { id: JobName.DatabaseBackup } };
+      }
+      case JobName.FolderAlbumSync: {
+        if (!item.data.debounce) {
+          return null;
+        }
+        return {
+          delay: FOLDER_ALBUM_SYNC_DELAY_MS,
+          deduplication: { id: `${JobName.FolderAlbumSync}/${item.data.userId}`, ttl: FOLDER_ALBUM_SYNC_DELAY_MS },
+        };
       }
       default: {
         return null;

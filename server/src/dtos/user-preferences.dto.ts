@@ -50,6 +50,14 @@ const NavigationUpdateSchema = z
   .describe('Navigation preferences')
   .meta({ id: 'NavigationUpdate' });
 
+const FolderAlbumsUpdateSchema = z
+  .object({
+    enabled: z.boolean().optional().describe('Whether every folder is mirrored as an album'),
+  })
+  .optional()
+  .describe('Folder album preferences')
+  .meta({ id: 'FolderAlbumsUpdate' });
+
 const PeopleUpdateSchema = z
   .object({
     enabled: z.boolean().optional().describe('Whether people are enabled'),
@@ -122,6 +130,7 @@ const UserPreferencesUpdateSchema = z
     cast: CastUpdateSchema,
     download: DownloadUpdateSchema,
     emailNotifications: EmailNotificationsUpdateSchema,
+    folderAlbums: FolderAlbumsUpdateSchema,
     folders: FoldersUpdateSchema,
     memories: MemoriesUpdateSchema,
     navigation: NavigationUpdateSchema,
@@ -152,6 +161,12 @@ const NavigationResponseSchema = z
     startPage: StartPageSchema,
   })
   .meta({ id: 'NavigationResponse' });
+
+const FolderAlbumsResponseSchema = z
+  .object({
+    enabled: z.boolean().describe('Whether every folder is mirrored as an album'),
+  })
+  .meta({ id: 'FolderAlbumsResponse' });
 
 const MemoriesResponseSchema = z
   .object({
@@ -230,6 +245,7 @@ const UserPreferencesResponseSchema = z
     folders: FoldersResponseSchema,
     memories: MemoriesResponseSchema,
     navigation: NavigationResponseSchema.optional(),
+    folderAlbums: FolderAlbumsResponseSchema.optional(),
     people: PeopleResponseSchema,
     ratings: RatingsResponseSchema,
     sharedLinks: SharedLinksResponseSchema,

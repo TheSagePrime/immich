@@ -54,6 +54,7 @@ import { AuthChallengeTable } from 'src/schema/tables/auth-challenge.table.js';
 import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-request.table.js';
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
+import { FolderAlbumSyncTable } from 'src/schema/tables/folder-album-sync.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
@@ -130,6 +131,7 @@ export class ImmichDatabase {
     ClusterGroupTable,
     ClusterGroupRequestTable,
     FaceSearchTable,
+    FolderAlbumSyncTable,
     GeodataPlacesTable,
     IntegrityReportTable,
     LibraryTable,
@@ -247,6 +249,8 @@ export interface DB {
   ocr_search: OcrSearchTable;
 
   face_search: FaceSearchTable;
+
+  folder_album_sync: FolderAlbumSyncTable;
 
   geodata_places: GeodataPlacesTable;
 

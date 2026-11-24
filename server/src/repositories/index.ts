@@ -18,6 +18,7 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FolderAlbumRepository } from 'src/repositories/folder-album.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -79,6 +80,7 @@ export const repositories = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FolderAlbumRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,

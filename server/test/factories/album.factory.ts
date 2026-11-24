@@ -33,6 +33,9 @@ export class AlbumFactory {
       order: AssetOrder.Desc,
       updatedAt: newDate(),
       updateId: newUuidV7(),
+      parentAlbumId: null,
+      folderOwnerId: null,
+      folderPath: null,
       ...dto,
     }).owner();
   }

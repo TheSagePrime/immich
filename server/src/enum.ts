@@ -493,6 +493,7 @@ export enum ManualJobName {
   IntegrityMissingFilesDeleteAll = `integrity-missing-files-delete-all`,
   IntegrityUntrackedFilesDeleteAll = `integrity-untracked-files-delete-all`,
   IntegrityChecksumFilesDeleteAll = `integrity-checksum-mismatch-delete-all`,
+  FolderAlbumSync = 'folder-album-sync',
 }
 
 export const ManualJobNameSchema = z.enum(ManualJobName).describe('Manual job name').meta({ id: 'ManualJobName' });
@@ -967,6 +968,9 @@ export enum JobName {
 
   UploadSessionCleanup = 'UploadSessionCleanup',
 
+  FolderAlbumSync = 'FolderAlbumSync',
+  FolderAlbumSyncQueueAll = 'FolderAlbumSyncQueueAll',
+
   VersionCheck = 'VersionCheck',
 
   // OCR
@@ -1045,6 +1049,7 @@ export enum DatabaseLock {
   DuplicateDetection = 1000,
   UploadSessionCleanup = 1100,
   FolderManagement = 1338,
+  FolderAlbumSync = 1339,
 }
 
 export enum MaintenanceAction {

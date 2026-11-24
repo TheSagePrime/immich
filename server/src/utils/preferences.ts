@@ -17,6 +17,9 @@ const getDefaultPreferences = (): UserPreferences => {
     navigation: {
       startPage: StartPage.Timeline,
     },
+    folderAlbums: {
+      enabled: true,
+    },
     memories: {
       enabled: true,
       duration: 5,
