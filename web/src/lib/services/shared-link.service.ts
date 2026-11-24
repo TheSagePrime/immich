@@ -1,24 +1,32 @@
 import QrCodeModal from '#lib/modals/QrCodeModal.svelte';
 import { executeMutation, readPreloadedQuery } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
-import { removeSharedLinkMutation } from '#lib/queries/shared-link.query.ts';
+import { removeAllSharedLinksMutation, removeSharedLinkMutation } from '#lib/queries/shared-link.query.ts';
 import { Route } from '#lib/route.ts';
 import { copyToClipboard } from '#lib/utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { type SharedLinkResponseDto } from '@immich/sdk';
 import { modalManager, type ActionItem } from '@immich/ui';
-import { mdiContentCopy, mdiLink, mdiPencilOutline, mdiQrcode, mdiTrashCanOutline } from '@mdi/js';
+import { mdiContentCopy, mdiLink, mdiLinkOff, mdiPencilOutline, mdiQrcode, mdiTrashCanOutline } from '@mdi/js';
 import type { MessageFormatter } from 'svelte-i18n';
 import { goto } from '$app/navigation';
 
-export const getSharedLinksActions = ($t: MessageFormatter) => {
+export const getSharedLinksActions = ($t: MessageFormatter, sharedLinks: SharedLinkResponseDto[] = []) => {
   const ViewAll: ActionItem = {
     title: $t('shared_links'),
     icon: mdiLink,
     onAction: () => goto(Route.sharedLinks()),
   };
 
-  return { ViewAll };
+  const RevokeAll: ActionItem = {
+    title: $t('revoke_all_shared_links'),
+    icon: mdiLinkOff,
+    color: 'danger',
+    $if: () => sharedLinks.length > 0,
+    onAction: () => handleRevokeAllSharedLinks(sharedLinks.length),
+  };
+
+  return { ViewAll, RevokeAll };
 };
 
 export const getSharedLinkActions = ($t: MessageFormatter, sharedLink: SharedLinkResponseDto) => {
@@ -72,4 +80,18 @@ const handleDeleteSharedLink = async (sharedLink: SharedLinkResponseDto) => {
   }
 
   await executeMutation(removeSharedLinkMutation, [{ id: sharedLink.id }]);
+};
+
+const handleRevokeAllSharedLinks = async (count: number) => {
+  const $t = await getFormatter();
+  const success = await modalManager.showDialog({
+    title: $t('revoke_all_shared_links'),
+    prompt: $t('revoke_all_shared_links_confirmation', { values: { count } }),
+    confirmText: $t('revoke_all'),
+  });
+  if (!success) {
+    return;
+  }
+
+  await executeMutation(removeAllSharedLinksMutation, []);
 };

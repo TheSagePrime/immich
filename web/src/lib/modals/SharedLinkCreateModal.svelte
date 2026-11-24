@@ -1,11 +1,13 @@
 <script lang="ts">
   import SharedLinkFormFields from '#lib/components/SharedLinkFormFields.svelte';
-  import { executeMutation } from '#lib/queries/client.ts';
+  import { executeMutation, readPreloadedQuery } from '#lib/queries/client.ts';
+  import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
   import { createSharedLinkMutation } from '#lib/queries/shared-link.query.ts';
   import { showSharedLinkQrCode } from '#lib/services/shared-link.service.ts';
   import { SharedLinkType } from '@immich/sdk';
   import { FormModal } from '@immich/ui';
   import { mdiLink } from '@mdi/js';
+  import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -22,7 +24,10 @@
   let showMetadata = $state(true);
   let password = $state('');
   let slug = $state('');
-  let expiresAt = $state<string | null>(null);
+  const defaultExpiryDays = readPreloadedQuery(getUserConfigQuery()).sharedLink.defaultExpiryDays;
+  let expiresAt = $state<string | null>(
+    defaultExpiryDays > 0 ? DateTime.now().plus({ days: defaultExpiryDays }).toUTC().toISO() : null,
+  );
 
   let type = $derived(albumId ? SharedLinkType.Album : SharedLinkType.Individual);
 
@@ -72,5 +77,6 @@
     bind:allowUpload
     bind:showMetadata
     bind:expiresAt
+    defaultExpiryDays={defaultExpiryDays > 0 ? defaultExpiryDays : undefined}
   />
 </FormModal>

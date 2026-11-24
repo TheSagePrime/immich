@@ -95,11 +95,17 @@ const SharedLinkResponseSchema = z
   .describe('Shared link response')
   .meta({ id: 'SharedLinkResponseDto' });
 
+const SharedLinkRemoveAllResponseSchema = z
+  .object({ count: z.int().min(0).describe('Number of removed shared links') })
+  .describe('Result of removing all shared links')
+  .meta({ id: 'SharedLinkRemoveAllResponseDto' });
+
 export class SharedLinkSearchDto extends createZodDto(SharedLinkSearchSchema) {}
 export class SharedLinkCreateDto extends createZodDto(SharedLinkCreateSchema) {}
 export class SharedLinkEditDto extends createZodDto(SharedLinkEditSchema) {}
 export class SharedLinkLoginDto extends createZodDto(SharedLinkLoginSchema) {}
 export class SharedLinkResponseDto extends createZodDto(SharedLinkResponseSchema) {}
+export class SharedLinkRemoveAllResponseDto extends createZodDto(SharedLinkRemoveAllResponseSchema) {}
 
 export function mapSharedLink(
   sharedLink: Omit<SharedLink, 'assets'> & Partial<Pick<SharedLink, 'assets'>>,

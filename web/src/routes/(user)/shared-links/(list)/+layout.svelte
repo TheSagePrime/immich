@@ -5,6 +5,7 @@
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getAllSharedLinksQuery } from '#lib/queries/shared-link.query.ts';
   import { Route } from '#lib/route.ts';
+  import { getSharedLinksActions } from '#lib/services/shared-link.service.ts';
   import { SharedLinkType } from '@immich/sdk';
   import { Container } from '@immich/ui';
   import { type Snippet } from 'svelte';
@@ -23,6 +24,7 @@
 
   const query = createPreloadedQuery(getAllSharedLinksQuery);
   const sharedLinks = $derived(query.data);
+  const { RevokeAll } = $derived(getSharedLinksActions($t, sharedLinks));
 
   const filterMap: Record<SharedLinkTab, string> = {
     all: $t('all'),
@@ -50,7 +52,7 @@
   );
 </script>
 
-<UserPageLayout title={data.meta.title}>
+<UserPageLayout title={data.meta.title} actions={[RevokeAll]}>
   {#snippet buttons()}
     <div class="hidden h-10 xl:block">
       <GroupTab

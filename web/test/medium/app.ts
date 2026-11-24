@@ -108,12 +108,16 @@ export const createApp = (page: Page, data: MockData) => {
       homeLink: page.locator('a[href="/"]'),
       heading: (name: string) => page.getByRole('heading', { name }),
       confirmRemove: () => button('remove').click(),
+      revokeAllButton: button('revoke_all_shared_links'),
+      confirmRevokeAll: () => button('revoke_all').click(),
+      emptyMessage: page.getByText('you_dont_have_any_shared_links', { exact: true }),
       card,
       cover: (link: { key: string }) => card(link).getByTestId('album-image'),
       brokenCover: (link: { key: string }) => card(link).getByTestId('broken-asset'),
       form: {
         showMetadataSwitch: page.getByRole('dialog').getByLabel('show_metadata', { exact: true }),
         allowDownloadSwitch: page.getByRole('dialog').getByLabel('allow_public_user_to_download', { exact: true }),
+        createButton: page.getByRole('dialog').getByRole('button', { name: 'create_link', exact: true }),
       },
     },
 

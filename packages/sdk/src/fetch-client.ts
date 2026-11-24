@@ -383,6 +383,10 @@ export type AdminConfigServerDto = {
     /** Public users */
     publicUsers: boolean;
 };
+export type AdminConfigSharedLinkDto = {
+    /** Default expiration in days for new shared links created in the web app (0 = never) */
+    defaultExpiryDays: number;
+};
 export type AdminConfigStorageTemplateDto = {
     /** Enabled */
     enabled: boolean;
@@ -435,6 +439,7 @@ export type AdminConfigDto = {
     passwordLogin: AdminConfigPasswordLoginDto;
     reverseGeocoding: AdminConfigReverseGeocodingDto;
     server: AdminConfigServerDto;
+    sharedLink: AdminConfigSharedLinkDto;
     storageTemplate: AdminConfigStorageTemplateDto;
     templates: AdminConfigTemplatesDto;
     theme: AdminConfigThemeDto;
@@ -1661,6 +1666,10 @@ export type UserConfigServerDto = {
     /** Public users */
     publicUsers: boolean;
 };
+export type UserConfigSharedLinkDto = {
+    /** Default expiration in days for new shared links created in the web app (0 = never) */
+    defaultExpiryDays: number;
+};
 export type UserConfigTrashDto = {
     /** Days */
     days: number;
@@ -1682,6 +1691,7 @@ export type UserConfigDto = {
     passwordLogin: UserConfigPasswordLoginDto;
     reverseGeocoding: UserConfigReverseGeocodingDto;
     server: UserConfigServerDto;
+    sharedLink: UserConfigSharedLinkDto;
     trash: UserConfigTrashDto;
     user: UserConfigUserDto;
 };
@@ -3148,6 +3158,10 @@ export type SessionCreateResponseDto = {
 export type SessionUpdateDto = {
     /** Reset pending sync state */
     isPendingSyncReset?: boolean;
+};
+export type SharedLinkRemoveAllResponseDto = {
+    /** Number of removed shared links */
+    count: number;
 };
 export type SharedLinkResponseDto = {
     album?: AlbumResponseDto;
@@ -7465,6 +7479,18 @@ export function lockSession({ id }: {
     return oazapfts.ok(oazapfts.fetchText(`/sessions/${encodeURIComponent(id)}/lock`, {
         ...opts,
         method: "POST"
+    }));
+}
+/**
+ * Delete all shared links
+ */
+export function removeAllSharedLinks(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedLinkRemoveAllResponseDto;
+    }>("/shared-links", {
+        ...opts,
+        method: "DELETE"
     }));
 }
 /**
