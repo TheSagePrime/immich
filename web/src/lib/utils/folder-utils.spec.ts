@@ -1,8 +1,10 @@
 import {
   canMoveFoldersTo,
+  findLibraryRootPath,
   getFolderCrumbs,
   getFolderName,
   getFolderParentPath,
+  getRelativeFolderPath,
   isSameOrInsidePath,
   isValidFolderEntryName,
   splitFileName,
@@ -49,5 +51,24 @@ describe('folder-utils', () => {
     expect(canMoveFoldersTo('/lib/a', ['/lib/a'])).toBe(false);
     expect(canMoveFoldersTo('/lib/a/x', ['/lib/a'])).toBe(false);
     expect(canMoveFoldersTo(null, [])).toBe(false);
+  });
+
+  it('should compute the path of a folder relative to its library root', () => {
+    expect(getRelativeFolderPath('/lib', '/lib')).toBe('');
+    expect(getRelativeFolderPath('/lib', '/lib/a/b/')).toBe('a/b');
+    expect(getRelativeFolderPath('/', '/a')).toBe('a');
+    expect(getRelativeFolderPath('/lib', '/other')).toBe('');
+  });
+
+  it('should find the library root of a folder', async () => {
+    const roots = new Set(['/mnt/lib']);
+    const getSummary = vi.fn((path: string) =>
+      Promise.resolve({ isLibraryRoot: roots.has(path), writable: path.startsWith('/mnt/lib') }),
+    );
+
+    await expect(findLibraryRootPath('/mnt/lib/a/b', getSummary)).resolves.toBe('/mnt/lib');
+    expect(getSummary).toHaveBeenCalledTimes(3);
+    await expect(findLibraryRootPath('/mnt/lib', getSummary)).resolves.toBe('/mnt/lib');
+    await expect(findLibraryRootPath('/photos/a', getSummary)).resolves.toBeUndefined();
   });
 });

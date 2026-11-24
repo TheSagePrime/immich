@@ -141,10 +141,14 @@ database. See "Rolling back to the official v3.4.2 images" above.
   page; after login, an explicit `continue` URL still wins.
 - **Covers, counts and breadcrumbs.** Every child folder shows the number of assets in it (including subfolders) and
   the newest asset as cover. Breadcrumbs show every path segment and every segment is a link.
+- **Same layout as the rest of the app.** The Folders page keeps the main sidebar (with Folders highlighted) and shows
+  folders as an album-style grid of cards; a folder shows its subfolders on top and its photos below. There is no
+  separate folder tree panel.
 - **Folder management in writable libraries.** Inside the first import path of a writable library, the owner of the
   library (or an admin) can create, rename, move and delete folders, rename files (the extension stays the same) and
   move or delete a selection of folders and files. Moves use a folder picker that only lists writable folders.
-  Management controls are hidden everywhere else.
+  These actions live in the page toolbar (New folder, Upload folder here, Select folders), in each card's menu
+  (Rename, Move, Delete) and in the selection bar. Management controls are hidden everywhere else.
 
 ### API (all additive)
 
