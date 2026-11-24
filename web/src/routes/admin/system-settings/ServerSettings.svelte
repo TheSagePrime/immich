@@ -44,6 +44,13 @@
           bind:checked={configToEdit.server.publicUsers}
         />
 
+        <SettingSwitch
+          title={$t('admin.server_simple_mode')}
+          subtitle={$t('admin.server_simple_mode_description')}
+          {disabled}
+          bind:checked={configToEdit.server.simpleMode}
+        />
+
         <div class="ms-4">
           <SettingButtonsRow bind:configToEdit keys={['server']} {disabled} />
         </div>

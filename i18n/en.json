@@ -366,6 +366,8 @@
     "server_public_users_description": "All users (name and email) are listed when adding a user to shared albums. When disabled, the user list will only be available to admin users.",
     "server_settings": "Server Settings",
     "server_settings_description": "Manage server settings",
+    "server_simple_mode": "Simple mode",
+    "server_simple_mode_description": "Hide rarely used features (Explore, Map, Memories, Tags, Utilities, Locked folder and the purchase reminder) from the web navigation for all users. Hidden pages can still be opened by their address. Turn off to show everything again.",
     "server_stats_page_description": "Admin server statistics page",
     "server_welcome_message": "Welcome message",
     "server_welcome_message_description": "A message that is displayed on the login page.",

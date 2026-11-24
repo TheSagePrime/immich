@@ -7,6 +7,7 @@
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
   import { Route } from '#lib/route.ts';
   import { recentAlbumsDropdown } from '#lib/stores/preferences.store.ts';
+  import { getSidebarVisibility } from '#lib/utils/sidebar-visibility.ts';
   import { NavbarGroup, NavbarItem } from '@immich/ui';
   import {
     mdiAccount,
@@ -41,26 +42,29 @@
 
   const query = createPreloadedQuery(getUserConfigQuery);
   const config = $derived(query.data);
+  const visible = $derived(getSidebarVisibility(config, authManager.preferences));
 </script>
 
 <Sidebar ariaLabel={$t('primary')}>
   <NavbarItem title={$t('photos')} href={Route.photos()} icon={mdiImageMultipleOutline} activeIcon={mdiImageMultiple} />
 
-  <NavbarItem title={$t('explore')} href={Route.explore()} icon={mdiMagnify} />
+  {#if visible.explore}
+    <NavbarItem title={$t('explore')} href={Route.explore()} icon={mdiMagnify} />
+  {/if}
 
-  {#if config.map.enabled}
+  {#if visible.map}
     <NavbarItem title={$t('map')} href={Route.map()} icon={mdiMapOutline} activeIcon={mdiMap} />
   {/if}
 
-  {#if authManager.preferences.memories.enabled && authManager.preferences.memories.sidebarWeb}
+  {#if visible.memories}
     <NavbarItem title={$t('memories')} href={Route.memories()} icon={mdiCardsOutline} activeIcon={mdiCards} />
   {/if}
 
-  {#if authManager.preferences.people.enabled && authManager.preferences.people.sidebarWeb}
+  {#if visible.people}
     <NavbarItem title={$t('people')} href={Route.people()} icon={mdiAccountOutline} activeIcon={mdiAccount} />
   {/if}
 
-  {#if authManager.preferences.sharedLinks.enabled && authManager.preferences.sharedLinks.sidebarWeb}
+  {#if visible.sharedLinks}
     <NavbarItem title={$t('shared_links')} href={Route.sharedLinks()} icon={mdiLink} />
   {/if}
 
@@ -88,11 +92,11 @@
     {/snippet}
   </NavbarItem>
 
-  {#if authManager.preferences.tags.enabled && authManager.preferences.tags.sidebarWeb}
+  {#if visible.tags}
     <NavbarItem title={$t('tags')} href={Route.tags()} icon={{ icon: mdiTagMultipleOutline, flipped: true }} />
   {/if}
 
-  {#if authManager.preferences.recentlyAdded.sidebarWeb}
+  {#if visible.recentlyAdded}
     <NavbarItem
       title={$t('recently_added')}
       href={Route.recentlyAdded()}
@@ -100,11 +104,13 @@
     />
   {/if}
 
-  {#if authManager.preferences.folders.enabled && authManager.preferences.folders.sidebarWeb}
+  {#if visible.folders}
     <NavbarItem title={$t('folders')} href={Route.folders()} icon={{ icon: mdiFolderOutline, flipped: true }} />
   {/if}
 
-  <NavbarItem title={$t('utilities')} href={Route.utilities()} icon={mdiToolboxOutline} activeIcon={mdiToolbox} />
+  {#if visible.utilities}
+    <NavbarItem title={$t('utilities')} href={Route.utilities()} icon={mdiToolboxOutline} activeIcon={mdiToolbox} />
+  {/if}
 
   <NavbarItem
     title={$t('archive')}
@@ -113,9 +119,11 @@
     activeIcon={mdiArchiveArrowDown}
   />
 
-  <NavbarItem title={$t('locked_folder')} href={Route.locked()} icon={mdiLockOutline} activeIcon={mdiLock} />
+  {#if visible.lockedFolder}
+    <NavbarItem title={$t('locked_folder')} href={Route.locked()} icon={mdiLockOutline} activeIcon={mdiLock} />
+  {/if}
 
-  {#if config.trash.enabled}
+  {#if visible.trash}
     <NavbarItem title={$t('trash')} href={Route.trash()} icon={mdiTrashCanOutline} activeIcon={mdiTrashCan} />
   {/if}
 
