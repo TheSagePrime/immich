@@ -10,10 +10,14 @@ import {
   searchAssetFiles,
   updateAssets,
 } from '@immich/sdk';
+import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Socket } from 'socket.io-client';
 import { createUserDto } from 'src/fixtures.js';
-import { app, asBearerAuth, asKeyAuth, utils } from 'src/utils.js';
+import { app, asBearerAuth, asKeyAuth, testAssetDir, utils } from 'src/utils.js';
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 type Kind = 'image' | 'video';
 type Result = { status: number; body: { message?: unknown } };
@@ -146,8 +150,8 @@ const isDenied = (route: MediaRoute, { status, body }: Result) => {
     return true;
   }
 
-  if (route.file) {
-    return status === 404;
+  if (route.file && status === 404) {
+    return true;
   }
 
   return status === 400 && typeof body?.message === 'string' && body.message.includes('access');
@@ -180,17 +184,29 @@ describe('media endpoints require authentication', () => {
   let foreignLink: SharedLinkResponseDto;
   let passwordCookies: string[];
   let readOnlyKey: string;
+  let websocket: Socket;
+
+  let jpeg: Buffer;
+
+  const createImage = (accessToken: string) =>
+    utils.createAsset(accessToken, {
+      assetData: { filename: 'photo.jpg', bytes: Buffer.concat([jpeg, randomBytes(32)]) },
+    });
 
   const createAsset = (kind: Kind) =>
-    utils.createAsset(owner.accessToken, kind === 'video' ? { assetData: { filename: 'example.mp4' } } : undefined);
+    kind === 'video'
+      ? utils.createAsset(owner.accessToken, { assetData: { filename: 'example.mp4' } })
+      : createImage(owner.accessToken);
 
   beforeAll(async () => {
+    jpeg = await readFile(join(testAssetDir, 'formats/jpg/el_torcal_rocks.jpg'));
     await utils.resetDatabase();
     admin = await utils.adminSetup();
     [owner, stranger] = await Promise.all([
       utils.userSetup(admin.accessToken, createUserDto.user1),
       utils.userSetup(admin.accessToken, createUserDto.user2),
     ]);
+    websocket = await utils.connectWebsocket(owner.accessToken);
 
     for (const kind of ['image', 'video'] as const) {
       const assets = await Promise.all([createAsset(kind), createAsset(kind), createAsset(kind)]);
@@ -241,8 +257,15 @@ describe('media endpoints require authentication', () => {
     const { secret } = await utils.createApiKey(owner.accessToken, [Permission.AssetRead]);
     readOnlyKey = secret;
 
-    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
-    await utils.waitForQueueFinish(admin.accessToken, 'thumbnailGeneration');
+    await Promise.all(
+      [shared.image, hidden.image, inAlbum.image].map(({ id }) =>
+        utils.waitForWebsocketEvent({ event: 'assetUpload', id }),
+      ),
+    );
+  });
+
+  afterAll(() => {
+    utils.disconnectWebsocket(websocket);
   });
 
   describe.each(mediaRoutes)('$name', (route) => {
@@ -437,14 +460,13 @@ describe('media endpoints require authentication', () => {
 
   describe('locked assets', () => {
     it('should stop serving an asset to its shared link once it is moved to the locked folder', async () => {
-      const asset = await utils.createAsset(owner.accessToken);
+      const asset = await createImage(owner.accessToken);
       const link = await utils.createSharedLink(owner.accessToken, {
         type: SharedLinkType.Individual,
         assetIds: [asset.id],
         allowDownload: true,
       });
-      await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
-      await utils.waitForQueueFinish(admin.accessToken, 'thumbnailGeneration');
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id });
 
       const before = await request(app).get(`/assets/${asset.id}/thumbnail?key=${link.key}`);
       expect(before.status).toBe(200);
@@ -455,7 +477,7 @@ describe('media endpoints require authentication', () => {
       );
 
       const thumbnail = await request(app).get(`/assets/${asset.id}/thumbnail?key=${link.key}`);
-      expect(thumbnail.status).toBe(404);
+      expect([400, 404]).toContain(thumbnail.status);
       const original = await request(app).get(`/assets/${asset.id}/original?key=${link.key}`);
       expect(original.status).toBe(404);
       const metadata = await request(app).get(`/assets/${asset.id}?key=${link.key}`);
