@@ -12,7 +12,9 @@ import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { bootstrapTelemetry } from 'src/repositories/telemetry.repository.js';
 import { ApiService } from 'src/services/api.service.js';
+import { SecurityHeadersService } from 'src/services/security-headers.service.js';
 import { useSwagger } from 'src/utils/misc.js';
+import { createSecurityHeaders } from 'src/utils/security-headers.js';
 
 export function configureTelemetry() {
   const { telemetry } = new ConfigRepository().getEnv();
@@ -26,6 +28,7 @@ export async function configureExpress(
   {
     permitSwaggerWrite = true,
     ssr,
+    securityHeaders,
   }: {
     /**
     Whether to allow swagger module to write to the specs.json
@@ -35,10 +38,12 @@ export async function configureExpress(
     permitSwaggerWrite?: boolean;
     /** Service to use for server-side rendering */
     ssr: typeof ApiService | typeof MaintenanceWorkerService;
+    /** Service that sets the security headers, with live system config */
+    securityHeaders?: typeof SecurityHeadersService;
   },
 ) {
   const configRepository = app.get(ConfigRepository);
-  const { environment, host, port, helmet, resourcePaths, network } = configRepository.getEnv();
+  const { environment, host, port, helmet, resourcePaths, network, security } = configRepository.getEnv();
 
   const logger = await app.resolve(LoggingRepository);
   logger.setContext('Bootstrap');
@@ -50,6 +55,20 @@ export async function configureExpress(
   if (helmet.config) {
     app.use(helmetMiddleware(helmet.config));
     logger.log('Initialized helmet middleware');
+  }
+
+  if (securityHeaders) {
+    app.use(app.get(securityHeaders).middleware());
+  } else {
+    const { messages, middleware } = createSecurityHeaders({
+      helmetPolicy: !!helmet.config?.contentSecurityPolicy,
+      contentSecurityPolicy: security.contentSecurityPolicy,
+      webRoot: resourcePaths.web.root,
+    });
+    for (const message of messages) {
+      logger.warn(message);
+    }
+    app.use(middleware);
   }
 
   app.use(cookieParser());

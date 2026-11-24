@@ -6,9 +6,10 @@
 
   type Props = {
     expiresAt: string | null;
+    defaultExpiryDays?: number;
   };
 
-  let { expiresAt = $bindable() }: Props = $props();
+  let { expiresAt = $bindable(), defaultExpiryDays }: Props = $props();
 
   const expirationOptions: [number, Intl.RelativeTimeFormatUnit][] = [
     [1, 'day'],
@@ -27,7 +28,14 @@
     })),
   ]);
 
-  let selectedPresetValue = $state<number | null>(null);
+  const getInitialPreset = () => {
+    if (defaultExpiryDays === undefined) {
+      return null;
+    }
+    return defaultExpiryDays > 0 ? Duration.fromObject({ days: defaultExpiryDays }).toMillis() : 0;
+  };
+
+  let selectedPresetValue = $state<number | null>(getInitialPreset());
 
   const getSelectedDate = (): DateTime | undefined => {
     return expiresAt ? DateTime.fromISO(expiresAt) : undefined;

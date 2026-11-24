@@ -8,6 +8,7 @@ import {
   SharedLinkCreateDto,
   SharedLinkEditDto,
   SharedLinkLoginDto,
+  SharedLinkRemoveAllResponseDto,
   SharedLinkResponseDto,
   SharedLinkSearchDto,
   mapSharedLink,
@@ -142,6 +143,12 @@ export class SharedLinkService extends BaseService {
   async remove(auth: AuthDto, id: string): Promise<void> {
     const sharedLink = await this.findOrFail(auth.user.id, id);
     await this.sharedLinkRepository.remove(sharedLink.id);
+  }
+
+  async removeAll(auth: AuthDto): Promise<SharedLinkRemoveAllResponseDto> {
+    const count = await this.sharedLinkRepository.removeAll(auth.user.id);
+    this.logger.log(`Removed ${count} shared link(s) of user ${auth.user.id}`);
+    return { count };
   }
 
   // TODO: replace `userId` with permissions and access control checks

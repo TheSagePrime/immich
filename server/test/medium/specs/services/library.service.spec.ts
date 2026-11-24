@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { chunk } from 'lodash-es';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, symlink, unlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
@@ -407,6 +407,112 @@ describe(LibraryService.name, () => {
       // the asset delete jobs are only queued here, so this just proves the handler itself unlinks nothing
       expect(existsSync(assetA)).toBe(true);
       expect(existsSync(assetB)).toBe(true);
+    });
+  });
+
+  describe('symbolic links', () => {
+    it('should not import file or directory links that lead outside the import path', async () => {
+      const { ctx } = setup();
+
+      const assetPath = await createFile(join(importPath, 'inside.png'));
+      const outsideFile = await createFile(join(outsidePath, 'secret.png'));
+      await createFile(join(outsidePath, 'folder/nested.png'));
+      await symlink(outsideFile, join(importPath, 'file-link.png'));
+      await symlink(join(outsidePath, 'folder'), join(importPath, 'folder-link'));
+      const library = await ctx.createLibrary({ importPaths: [importPath] });
+
+      await ctx.scan(library.id);
+
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([assetPath]);
+    });
+
+    it('should not import a watcher path that goes through a link to outside the import path', async () => {
+      const { sut, ctx } = setup();
+
+      await createFile(join(outsidePath, 'folder/nested.png'));
+      const outsideFile = await createFile(join(outsidePath, 'secret.png'));
+      await mkdir(importPath, { recursive: true });
+      await symlink(join(outsidePath, 'folder'), join(importPath, 'folder-link'));
+      await symlink(outsideFile, join(importPath, 'file-link.png'));
+      const insidePath = await createFile(join(importPath, 'inside.png'));
+      const library = await ctx.createLibrary({ importPaths: [importPath] });
+
+      await sut.handleSyncFiles({
+        libraryId: library.id,
+        paths: [join(importPath, 'folder-link/nested.png'), join(importPath, 'file-link.png'), insidePath],
+      });
+
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([insidePath]);
+    });
+
+    it('should offline an asset whose file was replaced by a link to outside the import path', async () => {
+      const { ctx } = setup();
+
+      const assetPath = await createFile(join(importPath, 'photo.png'));
+      const outsideFile = await createFile(join(outsidePath, 'secret.png'));
+      const library = await ctx.createLibrary({ importPaths: [importPath] });
+
+      await ctx.scan(library.id);
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([assetPath]);
+
+      await unlink(assetPath);
+      await symlink(outsideFile, assetPath);
+      await ctx.scan(library.id);
+
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([]);
+      await expect(
+        ctx.database.selectFrom('asset').select('isOffline').where('originalPath', '=', assetPath).executeTakeFirst(),
+      ).resolves.toEqual({ isOffline: true });
+    });
+
+    it('should offline an asset whose folder was replaced by a link to outside the import path', async () => {
+      const { ctx } = setup();
+
+      const assetPath = await createFile(join(importPath, 'album/photo.png'));
+      await createFile(join(outsidePath, 'album/photo.png'));
+      const library = await ctx.createLibrary({ importPaths: [importPath] });
+
+      await ctx.scan(library.id);
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([assetPath]);
+
+      await rename(join(importPath, 'album'), join(tempDir, 'moved-away'));
+      await symlink(join(outsidePath, 'album'), join(importPath, 'album'));
+      await ctx.scan(library.id);
+
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([]);
+    });
+
+    it('should keep an asset online when its link stays inside the import path', async () => {
+      const { ctx } = setup();
+
+      const assetPath = await createFile(join(importPath, 'photo.png'));
+      const otherPath = await createFile(join(importPath, 'other/original.png'));
+      const library = await ctx.createLibrary({ importPaths: [importPath] });
+
+      await ctx.scan(library.id);
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([otherPath, assetPath].sort());
+
+      await unlink(assetPath);
+      await symlink(otherPath, assetPath);
+      await ctx.scan(library.id);
+
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([otherPath, assetPath].sort());
+    });
+
+    it('should import from an import path that is itself a link', async () => {
+      const { ctx } = setup();
+
+      const realFolder = join(tempDir, 'real-folder');
+      await createFile(join(realFolder, 'photo.png'));
+      await mkdir(importRoot, { recursive: true });
+      const linkedImportPath = join(importRoot, 'linked');
+      await symlink(realFolder, linkedImportPath);
+      const library = await ctx.createLibrary({ importPaths: [linkedImportPath] });
+
+      await ctx.scan(library.id);
+      await ctx.scan(library.id);
+
+      await expect(ctx.getAssetPaths(library.id)).resolves.toEqual([join(linkedImportPath, 'photo.png')]);
     });
   });
 

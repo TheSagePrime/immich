@@ -4,6 +4,7 @@ import { configureExpress, configureTelemetry } from 'src/app.common.js';
 import { ApiModule } from 'src/app.module.js';
 import { AppRepository } from 'src/repositories/app.repository.js';
 import { ApiService } from 'src/services/api.service.js';
+import { SecurityHeadersService } from 'src/services/security-headers.service.js';
 import { isStartUpError } from 'src/utils/misc.js';
 
 async function bootstrap() {
@@ -24,6 +25,7 @@ async function bootstrap() {
 
   void configureExpress(app, {
     ssr: ApiService,
+    securityHeaders: SecurityHeadersService,
   });
 }
 

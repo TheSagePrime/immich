@@ -226,6 +226,12 @@ export class SharedLinkRepository {
     await this.db.deleteFrom('shared_link').where('shared_link.id', '=', id).execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async removeAll(userId: string): Promise<number> {
+    const result = await this.db.deleteFrom('shared_link').where('shared_link.userId', '=', userId).executeTakeFirst();
+    return Number(result.numDeletedRows);
+  }
+
   @ChunkedArray({ paramIndex: 1 })
   async addAssets(id: string, assetIds: string[]) {
     if (assetIds.length === 0) {

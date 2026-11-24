@@ -14691,6 +14691,45 @@
       }
     },
     "/shared-links": {
+      "delete": {
+        "description": "Delete every shared link of the current user. Links that were shared stop working immediately.",
+        "operationId": "removeAllSharedLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedLinkRemoveAllResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete all shared links",
+        "tags": [
+          "Shared links"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "sharedLink.delete"
+      },
       "get": {
         "description": "Retrieve a list of all shared links.",
         "operationId": "getAllSharedLinks",
@@ -19935,6 +19974,9 @@
           "server": {
             "$ref": "#/components/schemas/AdminConfigServerDto"
           },
+          "sharedLink": {
+            "$ref": "#/components/schemas/AdminConfigSharedLinkDto"
+          },
           "storageTemplate": {
             "$ref": "#/components/schemas/AdminConfigStorageTemplateDto"
           },
@@ -19970,6 +20012,7 @@
           "passwordLogin",
           "reverseGeocoding",
           "server",
+          "sharedLink",
           "storageTemplate",
           "templates",
           "theme",
@@ -20900,6 +20943,20 @@
           "externalDomain",
           "loginPageMessage",
           "publicUsers"
+        ],
+        "type": "object"
+      },
+      "AdminConfigSharedLinkDto": {
+        "properties": {
+          "defaultExpiryDays": {
+            "description": "Default expiration in days for new shared links created in the web app (0 = never)",
+            "maximum": 36500,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "defaultExpiryDays"
         ],
         "type": "object"
       },
@@ -30525,6 +30582,21 @@
         ],
         "type": "object"
       },
+      "SharedLinkRemoveAllResponseDto": {
+        "description": "Result of removing all shared links",
+        "properties": {
+          "count": {
+            "description": "Number of removed shared links",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "type": "object"
+      },
       "SharedLinkResponseDto": {
         "description": "Shared link response",
         "properties": {
@@ -35508,6 +35580,9 @@
           "server": {
             "$ref": "#/components/schemas/UserConfigServerDto"
           },
+          "sharedLink": {
+            "$ref": "#/components/schemas/UserConfigSharedLinkDto"
+          },
           "trash": {
             "$ref": "#/components/schemas/UserConfigTrashDto"
           },
@@ -35526,6 +35601,7 @@
           "passwordLogin",
           "reverseGeocoding",
           "server",
+          "sharedLink",
           "trash",
           "user"
         ],
@@ -35803,6 +35879,20 @@
           "externalDomain",
           "loginPageMessage",
           "publicUsers"
+        ],
+        "type": "object"
+      },
+      "UserConfigSharedLinkDto": {
+        "properties": {
+          "defaultExpiryDays": {
+            "description": "Default expiration in days for new shared links created in the web app (0 = never)",
+            "maximum": 36500,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "defaultExpiryDays"
         ],
         "type": "object"
       },

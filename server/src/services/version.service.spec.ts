@@ -93,13 +93,18 @@ describe(VersionService.name, () => {
   });
 
   describe('handVersionCheck', () => {
+    it('should not run by default', async () => {
+      await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Skipped);
+      expect(mocks.serverInfo.getLatestRelease).not.toHaveBeenCalled();
+    });
+
     it('should not run if version check is disabled', async () => {
       mocks.systemMetadata.get.mockResolvedValue({ newVersionCheck: { enabled: false } });
       await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Skipped);
     });
 
     it('should skip if the last check was less than 50 seconds ago', async () => {
-      mocks.systemMetadata.get.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      mocks.systemMetadata.get.mockResolvedValueOnce({ newVersionCheck: { enabled: true } }).mockResolvedValueOnce({
         checkedAt: DateTime.utc().minus({ seconds: 30 }).toISO(),
         releaseVersion: '1.0.0',
       });
@@ -108,7 +113,7 @@ describe(VersionService.name, () => {
     });
 
     it('should run if the last check was more than 50 seconds ago', async () => {
-      mocks.systemMetadata.get.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      mocks.systemMetadata.get.mockResolvedValueOnce({ newVersionCheck: { enabled: true } }).mockResolvedValueOnce({
         checkedAt: DateTime.utc().minus({ seconds: 60 }).toISO(),
         releaseVersion: '1.0.0',
       });
@@ -118,6 +123,7 @@ describe(VersionService.name, () => {
     });
 
     it('should run and notify if a new version is available', async () => {
+      mocks.systemMetadata.get.mockResolvedValueOnce({ newVersionCheck: { enabled: true } });
       mocks.serverInfo.getLatestRelease.mockResolvedValue(mockVersionResponse('v100.0.0'));
       await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Success);
       expect(mocks.systemMetadata.set).toHaveBeenCalled();
@@ -126,6 +132,7 @@ describe(VersionService.name, () => {
     });
 
     it('should not notify if the version is equal', async () => {
+      mocks.systemMetadata.get.mockResolvedValueOnce({ newVersionCheck: { enabled: true } });
       mocks.serverInfo.getLatestRelease.mockResolvedValue(mockVersionResponse('v3.0.0'));
       await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Success);
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.VersionCheckState, {
@@ -136,6 +143,7 @@ describe(VersionService.name, () => {
     });
 
     it('should handle a version check error', async () => {
+      mocks.systemMetadata.get.mockResolvedValueOnce({ newVersionCheck: { enabled: true } });
       mocks.serverInfo.getLatestRelease.mockRejectedValue(new Error('Version service is down'));
       await expect(sut.handleVersionCheck()).resolves.toEqual(JobStatus.Failed);
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
@@ -184,7 +192,9 @@ describe(VersionService.name, () => {
     });
 
     it('should also send a new release notification', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({ checkedAt: '2024-01-01', releaseVersion: 'v1.42.0' });
+      mocks.systemMetadata.get
+        .mockResolvedValueOnce({ newVersionCheck: { enabled: true } })
+        .mockResolvedValueOnce({ checkedAt: '2024-01-01', releaseVersion: 'v1.42.0' });
       await sut.onWebsocketConnection({ userId: '42' });
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_server_version', '42', {
         major: 3,

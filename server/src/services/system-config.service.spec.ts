@@ -139,7 +139,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     },
   },
   map: {
-    enabled: true,
+    enabled: false,
     lightStyle: 'https://tiles.immich.cloud/v1/style/light.json',
     darkStyle: 'https://tiles.immich.cloud/v1/style/dark.json',
   },
@@ -191,6 +191,9 @@ const updatedConfig = Object.freeze<SystemConfig>({
     loginPageMessage: '',
     publicUsers: true,
   },
+  sharedLink: {
+    defaultExpiryDays: 30,
+  },
   storageTemplate: {
     enabled: false,
     hashVerificationEnabled: true,
@@ -214,7 +217,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     extractEmbedded: false,
   },
   newVersionCheck: {
-    enabled: true,
+    enabled: false,
     channel: ReleaseChannel.Stable,
   },
   trash: {
