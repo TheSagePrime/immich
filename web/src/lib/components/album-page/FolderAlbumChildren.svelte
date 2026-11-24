@@ -16,6 +16,9 @@
   const items = $derived<FolderCard[]>(
     albums.map((album) => ({
       path: album.id,
+      href: Route.viewAlbum({ id: album.id }),
+      kind: 'folder',
+      writable: false,
       label: album.albumName,
       coverAssetId: album.albumThumbnailAssetId,
       assetCount: album.assetCount,
@@ -26,6 +29,6 @@
 {#if items.length > 0}
   <section class="my-4" data-testid="folder-album-children">
     <h2 class="mb-2 text-sm font-medium text-gray-500 uppercase dark:text-gray-300">{$t('albums_in_folder')}</h2>
-    <FolderCards {items} icon={mdiFolderOutline} onClick={(item) => goto(Route.viewAlbum({ id: item.path }))} />
+    <FolderCards {items} icon={mdiFolderOutline} onClick={(item) => goto(item.href)} />
   </section>
 {/if}
