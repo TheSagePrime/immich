@@ -33,3 +33,133 @@ where
   and "originalPath" not like $4
 order by
   regexp_replace("asset"."originalPath", $5, $6) asc
+
+-- ViewRepository.getFolderSummary
+with
+  "scoped" as (
+    select
+      "id",
+      "fileCreatedAt",
+      case
+        when strpos(substr("originalPath", length($1::text) + 1), '/') > 0 then split_part(
+          substr("originalPath", length($2::text) + 1),
+          '/',
+          1
+        )
+      end as "name"
+    from
+      "asset"
+    where
+      "ownerId" = $3::uuid
+      and "originalPath" like $4
+      and "visibility" = $5
+      and "deletedAt" is null
+      and "fileCreatedAt" is not null
+      and "fileModifiedAt" is not null
+      and "localDateTime" is not null
+  ),
+  "counts" as (
+    select
+      "name",
+      count(*)::int as "assetCount"
+    from
+      "scoped"
+    group by
+      "name"
+  ),
+  "covers" as (
+    select distinct
+      on ("name") "name",
+      "id" as "coverAssetId"
+    from
+      "scoped"
+    where
+      "name" is not null
+    order by
+      "name",
+      "fileCreatedAt" desc,
+      "id"
+  )
+select
+  "counts"."name",
+  "counts"."assetCount",
+  "covers"."coverAssetId"
+from
+  "counts"
+  left join "covers" on "covers"."name" = "counts"."name"
+order by
+  "counts"."name" asc nulls first
+
+-- ViewRepository.getLibraryAssetsByPath
+select
+  "id",
+  "originalPath",
+  "livePhotoVideoId",
+  "libraryId",
+  "ownerId",
+  "deletedAt"
+from
+  "asset"
+where
+  "libraryId" = $1::uuid
+  and "originalPath" = $2
+order by
+  "originalPath"
+
+-- ViewRepository.getAssetPathsByIds
+select
+  "asset"."id",
+  "asset"."originalPath",
+  "asset"."livePhotoVideoId",
+  "asset"."libraryId",
+  "asset"."ownerId",
+  "asset"."deletedAt",
+  "asset_file"."path" as "sidecarPath"
+from
+  "asset"
+  left join "asset_file" on "asset_file"."assetId" = "asset"."id"
+  and "asset_file"."type" = $1
+  and "asset_file"."isEdited" = $2
+where
+  "asset"."id" = any ($3::uuid[])
+
+-- ViewRepository.hasLibraryAssetsAtPath
+select
+  "id"
+from
+  "asset"
+where
+  "libraryId" = $1::uuid
+  and (
+    "originalPath" = $2
+    or "originalPath" like $3
+  )
+limit
+  $4
+
+-- ViewRepository.hasOtherAssetsWithStem
+select
+  "id"
+from
+  "asset"
+where
+  "ownerId" = $1::uuid
+  and "originalPath" like $2
+  and "originalPath" not like $3
+  and "id" != $4::uuid
+limit
+  $5
+
+-- ViewRepository.trashLibraryFolder
+update "asset"
+set
+  "deletedAt" = $1,
+  "status" = $2
+where
+  "libraryId" = $3::uuid
+  and "originalPath" like $4
+  and "deletedAt" is null
+  and "visibility" != $5
+returning
+  "id",
+  "originalPath"

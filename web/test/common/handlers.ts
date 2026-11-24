@@ -1,5 +1,6 @@
 import type { MockData } from '#test/common/data.ts';
 import { factory } from '#test/common/factories.ts';
+import { createFolderHandlers } from '#test/common/folders.ts';
 import { fromBase64, minimalMp4, placeholderImage } from '#test/common/helpers.ts';
 import type { Handlers } from '#test/common/types.ts';
 import { AssetUploadAction } from '@immich/sdk';
@@ -188,5 +189,6 @@ export const createHandlers = (data: MockData): Handlers => {
     playAssetVideo: () => ({ body: minimalMp4, contentType: 'video/mp4' }),
     viewAsset: ({ params }) => media(params.id),
     downloadAsset: ({ params }) => media(params.id),
+    ...createFolderHandlers(data.folders),
   };
 };

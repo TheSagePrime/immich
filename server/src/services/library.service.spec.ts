@@ -5,7 +5,7 @@ import { vitest } from 'vitest';
 import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { mapLibrary } from 'src/dtos/library.dto.js';
-import { AssetType, CronJob, ImmichWorker, JobName, JobStatus } from 'src/enum.js';
+import { AssetType, CronJob, DatabaseLock, ImmichWorker, JobName, JobStatus } from 'src/enum.js';
 import { LibraryService } from 'src/services/library.service.js';
 import type { ILibraryBulkIdsJob, ILibraryFileJob } from 'src/types.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -568,6 +568,7 @@ describe(LibraryService.name, () => {
         paths: ['/data/user1/photo.jpg'],
       };
 
+      mocks.asset.filterNewExternalAssetPaths.mockResolvedValue(['/data/user1/photo.jpg']);
       mocks.asset.createAll.mockResolvedValue([asset.id]);
       mocks.library.get.mockResolvedValue(library);
 
@@ -599,6 +600,22 @@ describe(LibraryService.name, () => {
       ]);
     });
 
+    it('should skip paths that already belong to an asset of the library', async () => {
+      const library = factory.library();
+
+      mocks.asset.filterNewExternalAssetPaths.mockResolvedValue([]);
+      mocks.asset.createAll.mockResolvedValue([]);
+      mocks.library.get.mockResolvedValue(library);
+
+      await expect(
+        sut.handleSyncFiles({ libraryId: library.id, paths: ['/data/user1/../user1/photo.jpg'] }),
+      ).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.asset.filterNewExternalAssetPaths).toHaveBeenCalledWith(library.id, ['/data/user1/photo.jpg']);
+      expect(mocks.storage.stat).not.toHaveBeenCalled();
+      expect(mocks.asset.createAll).toHaveBeenCalledWith([]);
+    });
+
     it('should not import an asset to a soft deleted library', async () => {
       const library = factory.library({ deletedAt: new Date() });
 
@@ -612,6 +629,31 @@ describe(LibraryService.name, () => {
       await expect(sut.handleSyncFiles(mockLibraryJob)).resolves.toBe(JobStatus.Failed);
 
       expect(mocks.asset.createAll.mock.calls).toEqual([]);
+    });
+  });
+
+  describe('handleAssetRemoval', () => {
+    it('should remove the asset at the path while holding the folder management lock', async () => {
+      const library = factory.library();
+      const asset = AssetFactory.create();
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue(asset);
+
+      await expect(sut.handleAssetRemoval({ libraryId: library.id, paths: ['/data/user1/photo.jpg'] })).resolves.toBe(
+        JobStatus.Success,
+      );
+
+      expect(mocks.database.withLock).toHaveBeenCalledWith(DatabaseLock.FolderManagement, expect.any(Function));
+      expect(mocks.asset.getByLibraryIdAndOriginalPath).toHaveBeenCalledWith(library.id, '/data/user1/photo.jpg');
+      expect(mocks.asset.remove).toHaveBeenCalledWith(asset);
+    });
+
+    it('should not remove anything when no asset has the path', async () => {
+      const library = factory.library();
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue(void 0);
+
+      await sut.handleAssetRemoval({ libraryId: library.id, paths: ['/data/user1/moved.jpg'] });
+
+      expect(mocks.asset.remove).not.toHaveBeenCalled();
     });
   });
 

@@ -7219,6 +7219,323 @@
         "x-immich-state": "Stable"
       }
     },
+    "/folders": {
+      "delete": {
+        "description": "Move the assets of folders and files of a writable external library to the trash, or delete them permanently with force. Empty folders are removed from disk.",
+        "operationId": "deleteFolderItems",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderDeleteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderDeleteResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete folders and files",
+        "tags": [
+          "Folders"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.delete"
+      },
+      "post": {
+        "description": "Create a new empty folder on disk inside a writable external library.",
+        "operationId": "createFolder",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create a folder",
+        "tags": [
+          "Folders"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.upload"
+      }
+    },
+    "/folders/assets/{id}/rename": {
+      "put": {
+        "description": "Rename the original file of an asset of a writable external library. The extension must stay the same.",
+        "operationId": "renameFolderAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetFileRenameDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderAssetResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Rename a file",
+        "tags": [
+          "Folders"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.update"
+      }
+    },
+    "/folders/browse": {
+      "get": {
+        "description": "List the child folders of a folder inside a writable external library, or the writable library folders when no path is given.",
+        "operationId": "browseFolders",
+        "parameters": [
+          {
+            "name": "path",
+            "required": false,
+            "in": "query",
+            "description": "Folder to list, omit to list the writable library roots",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 4096,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderBrowseResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Browse writable folders",
+        "tags": [
+          "Folders"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
+    "/folders/move": {
+      "put": {
+        "description": "Move folders and asset files into another folder of the same writable external library.",
+        "operationId": "moveFolderItems",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderMoveDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderMoveResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Move folders and files",
+        "tags": [
+          "Folders"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.update"
+      }
+    },
+    "/folders/rename": {
+      "put": {
+        "description": "Rename a folder on disk inside a writable external library and update the paths of its assets.",
+        "operationId": "renameFolder",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderRenameDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Rename a folder",
+        "tags": [
+          "Folders"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.update"
+      }
+    },
     "/jobs": {
       "get": {
         "deprecated": true,
@@ -18043,6 +18360,59 @@
         "x-immich-state": "Stable"
       }
     },
+    "/view/folder/summary": {
+      "get": {
+        "description": "Retrieve the child folders of a folder with their asset count and cover asset, plus the number of assets directly inside the folder.",
+        "operationId": "getFolderSummary",
+        "parameters": [
+          {
+            "name": "path",
+            "required": false,
+            "in": "query",
+            "description": "Folder path, \"/\" for the root",
+            "schema": {
+              "maxLength": 4096,
+              "default": "/",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderSummaryResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve a folder summary",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
     "/view/folder/unique-paths": {
       "get": {
         "description": "Retrieve a list of unique folder paths from asset original paths.",
@@ -18661,6 +19031,10 @@
     {
       "name": "Faces",
       "description": "A face is a detected human face within an asset, which can be associated with a person. Faces are normally detected via machine learning, but can also be created manually."
+    },
+    {
+      "name": "Folders",
+      "description": "Endpoints for managing folders and files on disk inside writable external libraries."
     },
     {
       "name": "Integrity (admin)",
@@ -21096,6 +21470,19 @@
         ],
         "type": "object"
       },
+      "AssetFileRenameDto": {
+        "properties": {
+          "name": {
+            "description": "New file name, the extension must stay the same",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "AssetFileResponseDto": {
         "properties": {
           "createdAt": {
@@ -23000,6 +23387,344 @@
         },
         "required": [
           "id"
+        ],
+        "type": "object"
+      },
+      "FolderAssetResponseDto": {
+        "properties": {
+          "id": {
+            "description": "Asset ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "originalFileName": {
+            "description": "New original file name",
+            "type": "string"
+          },
+          "originalPath": {
+            "description": "New original path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "originalFileName",
+          "originalPath"
+        ],
+        "type": "object"
+      },
+      "FolderBrowseEntryDto": {
+        "properties": {
+          "name": {
+            "description": "Folder name",
+            "type": "string"
+          },
+          "path": {
+            "description": "Absolute folder path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path"
+        ],
+        "type": "object"
+      },
+      "FolderBrowseResponseDto": {
+        "properties": {
+          "entries": {
+            "description": "Child folders",
+            "items": {
+              "$ref": "#/components/schemas/FolderBrowseEntryDto"
+            },
+            "type": "array"
+          },
+          "parentPath": {
+            "description": "Parent folder inside the library, null at a library root",
+            "nullable": true,
+            "type": "string"
+          },
+          "path": {
+            "description": "Listed folder, null for the list of library roots",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "entries",
+          "parentPath",
+          "path"
+        ],
+        "type": "object"
+      },
+      "FolderBulkFailureDto": {
+        "properties": {
+          "assetId": {
+            "description": "Asset that failed",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "path": {
+            "description": "Folder that failed",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Failure reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "FolderCreateDto": {
+        "properties": {
+          "name": {
+            "description": "New folder name",
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentPath": {
+            "description": "Folder in which to create the new folder",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "parentPath"
+        ],
+        "type": "object"
+      },
+      "FolderDeleteDto": {
+        "properties": {
+          "assetIds": {
+            "description": "Asset IDs (max 1000)",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "folderPaths": {
+            "description": "Folders (max 1000)",
+            "items": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "force": {
+            "description": "Delete permanently instead of moving the assets to the trash",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "FolderDeleteResponseDto": {
+        "properties": {
+          "deleted": {
+            "description": "Number of assets deleted permanently",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "failed": {
+            "description": "Items that could not be deleted",
+            "items": {
+              "$ref": "#/components/schemas/FolderBulkFailureDto"
+            },
+            "type": "array"
+          },
+          "removedFolders": {
+            "description": "Number of empty folders removed from disk",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "trashed": {
+            "description": "Number of assets moved to the trash",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted",
+          "failed",
+          "removedFolders",
+          "trashed"
+        ],
+        "type": "object"
+      },
+      "FolderMoveDto": {
+        "properties": {
+          "assetIds": {
+            "description": "Asset IDs (max 1000)",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          },
+          "destination": {
+            "description": "Destination folder",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "folderPaths": {
+            "description": "Folders (max 1000)",
+            "items": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "type": "object"
+      },
+      "FolderMoveResponseDto": {
+        "properties": {
+          "failed": {
+            "description": "Items that could not be moved",
+            "items": {
+              "$ref": "#/components/schemas/FolderBulkFailureDto"
+            },
+            "type": "array"
+          },
+          "moved": {
+            "description": "Number of folders and files moved",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "failed",
+          "moved"
+        ],
+        "type": "object"
+      },
+      "FolderRenameDto": {
+        "properties": {
+          "name": {
+            "description": "New folder name",
+            "minLength": 1,
+            "type": "string"
+          },
+          "path": {
+            "description": "Folder to rename",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path"
+        ],
+        "type": "object"
+      },
+      "FolderResponseDto": {
+        "properties": {
+          "path": {
+            "description": "Absolute folder path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "FolderSummaryItemDto": {
+        "properties": {
+          "assetCount": {
+            "description": "Number of assets in the child folder and its subfolders",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "coverAssetId": {
+            "description": "Newest asset in the child folder, used as its cover",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Child folder name",
+            "type": "string"
+          },
+          "path": {
+            "description": "Absolute child folder path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetCount",
+          "coverAssetId",
+          "name",
+          "path"
+        ],
+        "type": "object"
+      },
+      "FolderSummaryResponseDto": {
+        "properties": {
+          "children": {
+            "description": "Child folders",
+            "items": {
+              "$ref": "#/components/schemas/FolderSummaryItemDto"
+            },
+            "type": "array"
+          },
+          "directAssetCount": {
+            "description": "Number of assets directly inside the folder",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "isLibraryRoot": {
+            "description": "Whether the folder is the root of a writable library",
+            "type": "boolean"
+          },
+          "libraryId": {
+            "description": "Writable library that contains the folder",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "path": {
+            "description": "Normalized folder path",
+            "type": "string"
+          },
+          "writable": {
+            "description": "Whether the folder can be managed (inside a writable library)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "children",
+          "directAssetCount",
+          "isLibraryRoot",
+          "path",
+          "writable"
         ],
         "type": "object"
       },
@@ -24912,6 +25637,26 @@
         "required": [
           "axis"
         ],
+        "type": "object"
+      },
+      "NavigationResponse": {
+        "properties": {
+          "startPage": {
+            "$ref": "#/components/schemas/StartPage"
+          }
+        },
+        "required": [
+          "startPage"
+        ],
+        "type": "object"
+      },
+      "NavigationUpdate": {
+        "description": "Navigation preferences",
+        "properties": {
+          "startPage": {
+            "$ref": "#/components/schemas/StartPage"
+          }
+        },
         "type": "object"
       },
       "NotificationCreateDto": {
@@ -29990,6 +30735,14 @@
         },
         "type": "object"
       },
+      "StartPage": {
+        "description": "Page shown after login",
+        "enum": [
+          "timeline",
+          "folders"
+        ],
+        "type": "string"
+      },
       "StatisticsSearchDto": {
         "properties": {
           "albumIds": {
@@ -34183,6 +34936,9 @@
           "memories": {
             "$ref": "#/components/schemas/MemoriesResponse"
           },
+          "navigation": {
+            "$ref": "#/components/schemas/NavigationResponse"
+          },
           "people": {
             "$ref": "#/components/schemas/PeopleResponse"
           },
@@ -34240,6 +34996,9 @@
           },
           "memories": {
             "$ref": "#/components/schemas/MemoriesUpdate"
+          },
+          "navigation": {
+            "$ref": "#/components/schemas/NavigationUpdate"
           },
           "people": {
             "$ref": "#/components/schemas/PeopleUpdate"

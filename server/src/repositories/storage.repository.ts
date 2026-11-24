@@ -71,6 +71,22 @@ export class StorageRepository {
     return fs.copyFile(source, target);
   }
 
+  copyFileExclusive(source: string, target: string) {
+    return fs.copyFile(source, target, constants.COPYFILE_EXCL);
+  }
+
+  link(source: string, target: string) {
+    return fs.link(source, target);
+  }
+
+  lstat(filepath: string) {
+    return fs.lstat(filepath);
+  }
+
+  async mkdir(folder: string): Promise<void> {
+    await fs.mkdir(folder);
+  }
+
   stat(filepath: string) {
     return fs.stat(filepath);
   }

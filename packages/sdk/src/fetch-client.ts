@@ -698,6 +698,9 @@ export type MemoriesResponse = {
     /** Whether memories appear in web sidebar */
     sidebarWeb: boolean;
 };
+export type NavigationResponse = {
+    startPage: StartPage;
+};
 export type PeopleResponse = {
     /** Whether people are enabled */
     enabled: boolean;
@@ -740,6 +743,7 @@ export type UserPreferencesResponseDto = {
     emailNotifications: EmailNotificationsResponse;
     folders: FoldersResponse;
     memories: MemoriesResponse;
+    navigation?: NavigationResponse;
     people: PeopleResponse;
     purchase: PurchaseResponse;
     ratings: RatingsResponse;
@@ -785,6 +789,9 @@ export type MemoriesUpdate = {
     /** Whether memories appear in web sidebar */
     sidebarWeb?: boolean;
 };
+export type NavigationUpdate = {
+    startPage?: StartPage;
+};
 export type PeopleUpdate = {
     /** Whether people are enabled */
     enabled?: boolean;
@@ -828,6 +835,7 @@ export type UserPreferencesUpdateDto = {
     emailNotifications?: EmailNotificationsUpdate;
     folders?: FoldersUpdate;
     memories?: MemoriesUpdate;
+    navigation?: NavigationUpdate;
     people?: PeopleUpdate;
     purchase?: PurchaseUpdate;
     ratings?: RatingsUpdate;
@@ -1771,6 +1779,88 @@ export type AssetFaceDeleteDto = {
 export type FaceDto = {
     /** Face ID */
     id: string;
+};
+export type FolderDeleteDto = {
+    /** Asset IDs (max 1000) */
+    assetIds?: string[];
+    /** Folders (max 1000) */
+    folderPaths?: string[];
+    /** Delete permanently instead of moving the assets to the trash */
+    force?: boolean;
+};
+export type FolderBulkFailureDto = {
+    /** Asset that failed */
+    assetId?: string;
+    /** Folder that failed */
+    path?: string;
+    /** Failure reason */
+    reason: string;
+};
+export type FolderDeleteResponseDto = {
+    /** Number of assets deleted permanently */
+    deleted: number;
+    /** Items that could not be deleted */
+    failed: FolderBulkFailureDto[];
+    /** Number of empty folders removed from disk */
+    removedFolders: number;
+    /** Number of assets moved to the trash */
+    trashed: number;
+};
+export type FolderCreateDto = {
+    /** New folder name */
+    name: string;
+    /** Folder in which to create the new folder */
+    parentPath: string;
+};
+export type FolderResponseDto = {
+    /** Absolute folder path */
+    path: string;
+};
+export type AssetFileRenameDto = {
+    /** New file name, the extension must stay the same */
+    name: string;
+};
+export type FolderAssetResponseDto = {
+    /** Asset ID */
+    id: string;
+    /** New original file name */
+    originalFileName: string;
+    /** New original path */
+    originalPath: string;
+};
+export type FolderBrowseEntryDto = {
+    /** Folder name */
+    name: string;
+    /** Absolute folder path */
+    path: string;
+};
+export type FolderBrowseResponseDto = {
+    /** Child folders */
+    entries: FolderBrowseEntryDto[];
+    /** Parent folder inside the library, null at a library root */
+    parentPath: string | null;
+    /** Listed folder, null for the list of library roots */
+    path: string | null;
+};
+export type FolderMoveDto = {
+    /** Asset IDs (max 1000) */
+    assetIds?: string[];
+    /** Destination folder */
+    destination: string;
+    /** Folders (max 1000) */
+    folderPaths?: string[];
+};
+export type FolderMoveResponseDto = {
+    /** Items that could not be moved */
+    failed: FolderBulkFailureDto[];
+    /** Number of folders and files moved */
+    moved: number;
+};
+export type FolderRenameDto = {
+    /** New folder name */
+    name: string;
+    /** Folder to rename */
+    path: string;
 };
 export type QueueStatisticsDto = {
     /** Number of active jobs */
@@ -3306,6 +3396,30 @@ export type CreateProfileImageResponseDto = {
     profileImagePath: string;
     /** User ID */
     userId: string;
+};
+export type FolderSummaryItemDto = {
+    /** Number of assets in the child folder and its subfolders */
+    assetCount: number;
+    /** Newest asset in the child folder, used as its cover */
+    coverAssetId: string | null;
+    /** Child folder name */
+    name: string;
+    /** Absolute child folder path */
+    path: string;
+};
+export type FolderSummaryResponseDto = {
+    /** Child folders */
+    children: FolderSummaryItemDto[];
+    /** Number of assets directly inside the folder */
+    directAssetCount: number;
+    /** Whether the folder is the root of a writable library */
+    isLibraryRoot: boolean;
+    /** Writable library that contains the folder */
+    libraryId?: string;
+    /** Normalized folder path */
+    path: string;
+    /** Whether the folder can be managed (inside a writable library) */
+    writable: boolean;
 };
 export type WorkflowStepDto = {
     /** Step configuration */
@@ -5633,6 +5747,97 @@ export function reassignFacesById({ id, faceDto }: {
         ...opts,
         method: "PUT",
         body: faceDto
+    })));
+}
+/**
+ * Delete folders and files
+ */
+export function deleteFolderItems({ folderDeleteDto }: {
+    folderDeleteDto: FolderDeleteDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderDeleteResponseDto;
+    }>("/folders", oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: folderDeleteDto
+    })));
+}
+/**
+ * Create a folder
+ */
+export function createFolder({ folderCreateDto }: {
+    folderCreateDto: FolderCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FolderResponseDto;
+    }>("/folders", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: folderCreateDto
+    })));
+}
+/**
+ * Rename a file
+ */
+export function renameFolderAsset({ id, assetFileRenameDto }: {
+    id: string;
+    assetFileRenameDto: AssetFileRenameDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderAssetResponseDto;
+    }>(`/folders/assets/${encodeURIComponent(id)}/rename`, oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: assetFileRenameDto
+    })));
+}
+/**
+ * Browse writable folders
+ */
+export function browseFolders({ path }: {
+    path?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderBrowseResponseDto;
+    }>(`/folders/browse${QS.query(QS.explode({
+        path
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Move folders and files
+ */
+export function moveFolderItems({ folderMoveDto }: {
+    folderMoveDto: FolderMoveDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderMoveResponseDto;
+    }>("/folders/move", oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: folderMoveDto
+    })));
+}
+/**
+ * Rename a folder
+ */
+export function renameFolder({ folderRenameDto }: {
+    folderRenameDto: FolderRenameDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderResponseDto;
+    }>("/folders/rename", oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: folderRenameDto
     })));
 }
 /**
@@ -8022,6 +8227,21 @@ export function getAssetsByOriginalPath({ path }: {
     }));
 }
 /**
+ * Retrieve a folder summary
+ */
+export function getFolderSummary({ path }: {
+    path?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FolderSummaryResponseDto;
+    }>(`/view/folder/summary${QS.query(QS.explode({
+        path
+    }))}`, {
+        ...opts
+    }));
+}
+/**
  * Retrieve unique paths
  */
 export function getUniqueOriginalPaths(opts?: Oazapfts.RequestOpts) {
@@ -8298,6 +8518,10 @@ export enum CalendarHeatmapType {
 export enum AssetOrder {
     Asc = "asc",
     Desc = "desc"
+}
+export enum StartPage {
+    Timeline = "timeline",
+    Folders = "folders"
 }
 export enum PersonUpdateStrategy {
     Self = "self",

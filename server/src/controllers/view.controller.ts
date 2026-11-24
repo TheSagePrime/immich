@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { FolderSummaryQueryDto, FolderSummaryResponseDto } from 'src/dtos/folder.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
 import { ViewService } from 'src/services/view.service.js';
@@ -21,6 +22,18 @@ export class ViewController {
   })
   getUniqueOriginalPaths(@Auth() auth: AuthDto): Promise<string[]> {
     return this.service.getUniqueOriginalPaths(auth);
+  }
+
+  @Get('folder/summary')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve a folder summary',
+    description:
+      'Retrieve the child folders of a folder with their asset count and cover asset, plus the number of assets directly inside the folder.',
+    history: new HistoryBuilder().added('v3'),
+  })
+  getFolderSummary(@Auth() auth: AuthDto, @Query() dto: FolderSummaryQueryDto): Promise<FolderSummaryResponseDto> {
+    return this.service.getFolderSummary(auth, dto);
   }
 
   @Get('folder')

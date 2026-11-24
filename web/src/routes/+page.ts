@@ -3,6 +3,7 @@ import { readPreloadedQuery } from '#lib/queries/client.ts';
 import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';
 import { Route } from '#lib/route.ts';
 import { init } from '#lib/utils/client.ts';
+import { getHomeRoute } from '#lib/utils/home-route.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
@@ -21,7 +22,7 @@ export const load = (async ({ fetch }) => {
 
     await authManager.load();
     if (authManager.authenticated) {
-      redirect(307, Route.photos());
+      redirect(307, getHomeRoute(authManager.preferences));
     }
 
     if (serverConfig.isInitialized) {

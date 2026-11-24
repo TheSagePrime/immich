@@ -4,7 +4,7 @@
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { AssetOrder, PersonUpdateStrategy, updateMyPreferences } from '@immich/sdk';
+  import { AssetOrder, PersonUpdateStrategy, StartPage, updateMyPreferences } from '@immich/sdk';
   import { Button, Field, NumberInput, Select, Switch, toastManager } from '@immich/ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -18,6 +18,7 @@
   // Folders
   let foldersEnabled = $state(authManager.preferences.folders?.enabled ?? false);
   let foldersSidebar = $state(authManager.preferences.folders?.sidebarWeb ?? false);
+  let startPage = $state(authManager.preferences.navigation?.startPage ?? StartPage.Timeline);
 
   // Memories
   let memoriesEnabled = $state(authManager.preferences.memories?.enabled ?? true);
@@ -55,6 +56,7 @@
         userPreferencesUpdateDto: {
           albums: { defaultAssetOrder },
           folders: { enabled: foldersEnabled, sidebarWeb: foldersSidebar },
+          navigation: { startPage: foldersEnabled ? startPage : StartPage.Timeline },
           memories: { enabled: memoriesEnabled, duration: memoriesDuration, sidebarWeb: memoriesSidebar },
           people: {
             enabled: peopleEnabled,
@@ -109,6 +111,16 @@
             {#if foldersEnabled}
               <Field label={$t('sidebar')} description={$t('sidebar_display_description')}>
                 <Switch bind:checked={foldersSidebar} />
+              </Field>
+
+              <Field label={$t('start_page')} description={$t('start_page_description')}>
+                <Select
+                  options={[
+                    { label: $t('start_page_timeline'), value: StartPage.Timeline },
+                    { label: $t('start_page_folders'), value: StartPage.Folders },
+                  ]}
+                  bind:value={startPage}
+                />
               </Field>
             {/if}
           </div>
