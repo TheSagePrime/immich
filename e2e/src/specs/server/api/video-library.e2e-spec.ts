@@ -240,7 +240,9 @@ describe('/video-library', () => {
 
       const { status, body } = await request(app).get(`/assets/${videoId}/subtitles`).query({ key: sharedLink.key });
       expect(status).toBe(200);
-      expect(body.map(({ name }: { name: string }) => name).toSorted()).toEqual(['.de.forced.vtt', '.en.srt']);
+      expect(
+        body.map(({ name }: { name: string }) => name).toSorted((a: string, b: string) => a.localeCompare(b)),
+      ).toEqual(['.de.forced.vtt', '.en.srt']);
       expect(JSON.stringify(body)).not.toContain('movie');
 
       const { status: fileStatus, text } = await request(app)
