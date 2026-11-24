@@ -347,6 +347,11 @@ where
   )
   and "shared_link"."slug" = $2
 
+-- SharedLinkRepository.removeAll
+delete from "shared_link"
+where
+  "shared_link"."userId" = $1
+
 -- SharedLinkRepository.getSharedLinks
 select
   "shared_link".*,

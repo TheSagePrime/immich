@@ -442,6 +442,16 @@ const AdminConfigSchemaWithVisibility = z
         publicUsers: configBool.describe('Public users').meta({ visibility: User }),
       })
       .meta({ id: 'AdminConfigServerDto' }),
+    sharedLink: z
+      .object({
+        defaultExpiryDays: z
+          .int()
+          .min(0)
+          .max(36_500)
+          .describe('Default expiration in days for new shared links created in the web app (0 = never)')
+          .meta({ visibility: User }),
+      })
+      .meta({ id: 'AdminConfigSharedLinkDto' }),
     user: z
       .object({ deleteDelay: z.int().min(1).describe('Delete delay').meta({ visibility: User }) })
       .meta({ id: 'AdminConfigUserDto' }),
@@ -689,7 +699,7 @@ export const defaults = Object.freeze<SystemConfig>({
     },
   },
   map: {
-    enabled: true,
+    enabled: false,
     lightStyle: 'https://tiles.immich.cloud/v1/style/light.json',
     darkStyle: 'https://tiles.immich.cloud/v1/style/dark.json',
   },
@@ -761,7 +771,7 @@ export const defaults = Object.freeze<SystemConfig>({
     },
   },
   newVersionCheck: {
-    enabled: true,
+    enabled: false,
     channel: ReleaseChannel.Stable,
   },
   nightlyTasks: {
@@ -792,6 +802,9 @@ export const defaults = Object.freeze<SystemConfig>({
     externalDomain: '',
     loginPageMessage: '',
     publicUsers: true,
+  },
+  sharedLink: {
+    defaultExpiryDays: 30,
   },
   notifications: {
     smtp: {

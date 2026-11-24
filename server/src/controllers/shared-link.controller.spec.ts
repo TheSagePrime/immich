@@ -90,6 +90,29 @@ describe(SharedLinkController.name, () => {
     });
   });
 
+  describe('DELETE /shared-links', () => {
+    it('should require shared link delete permission', async () => {
+      await request(ctx.getHttpServer()).delete('/shared-links');
+
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedLinkDelete, sharedLinkRoute: false }),
+        }),
+      );
+    });
+
+    it('should return the number of removed links', async () => {
+      service.removeAll.mockResolvedValue({ count: 3 });
+
+      const { status, body } = await request(ctx.getHttpServer()).delete('/shared-links');
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ count: 3 });
+      expect(service.removeAll).toHaveBeenCalledTimes(1);
+      expect(service.remove).not.toHaveBeenCalled();
+    });
+  });
+
   describe('DELETE /shared-links/:id/assets', () => {
     it('should require shared link update permission', async () => {
       await request(ctx.getHttpServer()).delete(`/shared-links/${factory.uuid()}/assets`).send({ assetIds: [] });

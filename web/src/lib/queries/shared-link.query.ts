@@ -3,6 +3,7 @@ import { asMutation, queryClient } from '#lib/queries/client.ts';
 import {
   createSharedLink,
   getAllSharedLinks,
+  removeAllSharedLinks,
   removeSharedLink,
   removeSharedLinkAssets,
   updateSharedLink,
@@ -67,6 +68,18 @@ export const removeSharedLinkMutation = () =>
       await onAlbumSharingChange(albumId);
     },
     meta: { success: { toast: 'deleted_shared_link' }, error: { toast: 'errors.unable_to_delete_shared_link' } },
+  });
+
+export const removeAllSharedLinksMutation = () =>
+  asMutation(removeAllSharedLinks, {
+    onSuccess: async () => {
+      queryClient.setQueryData(getAllSharedLinksQuery().queryKey, []);
+      await invalidateAlbums();
+    },
+    meta: {
+      success: { toast: 'all_shared_links_revoked' },
+      error: { toast: 'errors.unable_to_revoke_all_shared_links' },
+    },
   });
 
 export const removeSharedLinkAssetsMutation = () =>

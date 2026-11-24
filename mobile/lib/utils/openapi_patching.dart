@@ -58,10 +58,12 @@ final Map<String, Map<String, Object?>> openApiPatches = {
   'LibraryResponseDto': {'writable': false},
   'AdminConfigDto': {
     'passkey': {'enabled': false, 'domain': null, 'additionalDomains': const []},
+    'sharedLink': {'defaultExpiryDays': 0},
   },
   'UserConfigDto': {
     'notifications': UserConfigNotificationsDto(smtp: UserConfigSmtpDto(enabled: false)).toJson(),
     'passkey': {'enabled': false},
+    'sharedLink': {'defaultExpiryDays': 0},
   },
 };
 

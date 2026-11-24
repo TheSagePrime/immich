@@ -24,6 +24,7 @@ import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobOf } from 'src/types.js';
 import { toExternalAssetInsert } from 'src/utils/library.js';
+import { createSymlinkEscapeChecker } from 'src/utils/library-symlink.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, createLibraryMatcher, findOrFail, handlePromiseError } from 'src/utils/misc.js';
 
@@ -266,10 +267,17 @@ export class LibraryService extends BaseService {
       job.paths.map((filePath) => path.normalize(filePath)),
     );
 
+    const isEscapingSymlink = createSymlinkEscapeChecker(this.storageRepository, library.importPaths);
     const assetImports: Insertable<AssetTable>[] = [];
     await Promise.all(
       paths.map(async (path) => {
         try {
+          if (await isEscapingSymlink(path)) {
+            this.logger.warn(
+              `Skipping ${path} in library ${job.libraryId}: it is reached through a symbolic link that leads outside the import path`,
+            );
+            return;
+          }
           const asset = await this.processEntity(path, library.ownerId, job.libraryId);
           assetImports.push(asset);
         } catch (error) {
@@ -507,8 +515,17 @@ export class LibraryService extends BaseService {
 
     this.logger.debug(`Checking batch of ${assets.length} existing asset(s) in library ${job.libraryId}`);
 
+    const isEscapingSymlink = createSymlinkEscapeChecker(this.storageRepository, job.importPaths);
     const stats = await Promise.all(
-      assets.map((asset) => this.storageRepository.stat(asset.originalPath).catch(() => null)),
+      assets.map(async (asset) => {
+        if (await isEscapingSymlink(asset.originalPath)) {
+          this.logger.warn(
+            `Asset ${asset.originalPath} is reached through a symbolic link that leads outside the import path, treating it as missing in library ${job.libraryId}`,
+          );
+          return null;
+        }
+        return this.storageRepository.stat(asset.originalPath).catch(() => null);
+      }),
     );
 
     for (let i = 0; i < assets.length; i++) {

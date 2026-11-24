@@ -3,6 +3,7 @@ import type { MockData } from '#test/common/data.ts';
 import { factory } from '#test/common/factories.ts';
 import { expect, test } from '#test/medium/fixtures.ts';
 import { SharedLinkType } from '@immich/sdk';
+import { DateTime } from 'luxon';
 
 const setup = (data: MockData, overrides = {}) => {
   const assets = [factory.asset(), factory.asset()];
@@ -123,6 +124,58 @@ test.describe('shared link', () => {
     expect(api.removeSharedLinkAssets).toHaveBeenCalledWith({
       params: { id: link.id },
       body: { assetIds: [first.id] },
+    });
+  });
+
+  test('owner revokes all shared links at once', async ({ page, data, api, app }) => {
+    setup(data);
+    data.addSharedLinks(factory.sharedLink({ type: SharedLinkType.Individual, assets: [factory.asset()] }));
+    await page.goto(Route.sharedLinks());
+    await expect(app.sharedLink.revokeAllButton).toBeVisible();
+
+    await app.sharedLink.revokeAllButton.click();
+    await app.sharedLink.confirmRevokeAll();
+
+    await expect(app.sharedLink.emptyMessage).toBeVisible();
+    await expect(app.sharedLink.revokeAllButton).toHaveCount(0);
+    expect(api.removeAllSharedLinks).toHaveBeenCalled();
+  });
+
+  test('the create form preselects the default expiration', async ({ page, data, api, app }) => {
+    const asset = factory.asset();
+    data.addAssets(asset);
+    await page.goto(Route.viewAsset({ id: asset.id }));
+    await app.viewer.waitForAsset(asset);
+
+    await app.viewer.shareButton.click();
+    await app.sharedLink.form.createButton.click();
+
+    await expect.poll(() => api.createSharedLink.calls.length).toBe(1);
+    const [{ body }] = api.createSharedLink.calls;
+    const days = DateTime.fromISO(body.expiresAt!).diffNow('days').days;
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThanOrEqual(30);
+    expect(api.createSharedLink).toHaveBeenCalledWith({
+      body: expect.objectContaining({ type: SharedLinkType.Individual, assetIds: [asset.id] }),
+    });
+  });
+
+  test('a default expiration of 0 preselects never', async ({ page, data, api, app }) => {
+    data.userConfig.sharedLink.defaultExpiryDays = 0;
+    const asset = factory.asset();
+    data.addAssets(asset);
+    await page.goto(Route.viewAsset({ id: asset.id }));
+    await app.viewer.waitForAsset(asset);
+
+    await app.viewer.shareButton.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('button', { name: 'never', exact: true })).not.toHaveClass(/border-primary/);
+    await expect(dialog.getByRole('button', { name: 'in 30 days', exact: true })).toHaveClass(/border-primary/);
+    await app.sharedLink.form.createButton.click();
+
+    await expect.poll(() => api.createSharedLink.calls.length).toBe(1);
+    expect(api.createSharedLink).toHaveBeenCalledWith({
+      body: expect.objectContaining({ type: SharedLinkType.Individual, assetIds: [asset.id], expiresAt: null }),
     });
   });
 });

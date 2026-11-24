@@ -439,4 +439,57 @@ describe('/shared-links', () => {
       expect(status).toBe(204);
     });
   });
+
+  describe('DELETE /shared-links', () => {
+    it('should require authentication', async () => {
+      const { status } = await request(app).delete('/shared-links');
+
+      expect(status).toBe(401);
+    });
+
+    it('should not be available to shared link sessions', async () => {
+      const { status } = await request(app).delete('/shared-links').query({ key: linkWithAssets.key });
+
+      expect(status).toBe(403);
+    });
+
+    it('should revoke every shared link of the user and only of the user', async () => {
+      const adminAsset = await utils.createAsset(admin.accessToken);
+      const otherLink = await utils.createSharedLink(admin.accessToken, {
+        type: SharedLinkType.Individual,
+        assetIds: [adminAsset.id],
+      });
+
+      const before = await request(app).get('/shared-links').set('Authorization', `Bearer ${user1.accessToken}`);
+      expect(before.body.length).toBeGreaterThan(0);
+
+      const { status, body } = await request(app)
+        .delete('/shared-links')
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ count: before.body.length });
+
+      const after = await request(app).get('/shared-links').set('Authorization', `Bearer ${user1.accessToken}`);
+      expect(after.body).toEqual([]);
+
+      const revoked = await request(app).get('/shared-links/me').query({ key: linkWithAssets.key });
+      expect(revoked.status).toBe(401);
+
+      const adminLinks = await request(app).get('/shared-links').set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(adminLinks.body).toEqual([expect.objectContaining({ id: otherLink.id })]);
+
+      const again = await request(app).delete('/shared-links').set('Authorization', `Bearer ${user1.accessToken}`);
+      expect(again.body).toEqual({ count: 0 });
+    });
+
+    it('should keep creating links without an expiration date', async () => {
+      const link = await utils.createSharedLink(user1.accessToken, {
+        type: SharedLinkType.Individual,
+        assetIds: [asset1.id],
+      });
+
+      expect(link.expiresAt).toBeNull();
+    });
+  });
 });

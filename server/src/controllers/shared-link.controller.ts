@@ -23,6 +23,7 @@ import {
   SharedLinkCreateDto,
   SharedLinkEditDto,
   SharedLinkLoginDto,
+  SharedLinkRemoveAllResponseDto,
   SharedLinkResponseDto,
   SharedLinkSearchDto,
 } from 'src/dtos/shared-link.dto.js';
@@ -134,6 +135,17 @@ export class SharedLinkController {
     @Body() dto: SharedLinkEditDto,
   ): Promise<SharedLinkResponseDto> {
     return this.service.update(auth, id, dto);
+  }
+
+  @Delete()
+  @Authenticated({ permission: Permission.SharedLinkDelete })
+  @Endpoint({
+    summary: 'Delete all shared links',
+    description: 'Delete every shared link of the current user. Links that were shared stop working immediately.',
+    history: new HistoryBuilder().added('v3'),
+  })
+  removeAllSharedLinks(@Auth() auth: AuthDto): Promise<SharedLinkRemoveAllResponseDto> {
+    return this.service.removeAll(auth);
   }
 
   @Delete(':id')
