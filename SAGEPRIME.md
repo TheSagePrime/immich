@@ -42,6 +42,7 @@ All fork migrations are newer than the last official `v3.4.2` migration,
 | `1795470129477-AddLibraryWritable`                      | foundation | Adds `library.writable boolean NOT NULL DEFAULT false`                                                          | Drops the column |
 | `1795560000000-AddAssetOwnerIdOriginalPathPatternIndex` | folders    | Adds the index `asset_ownerId_originalPath_pattern_idx` on `asset ("ownerId", "originalPath" text_pattern_ops)` | Drops the index  |
 | `1795600000000-AddUploadSessionTable`                   | uploads    | Adds the `upload_session` table (resumable folder uploads)                                                      | Drops the table  |
+| `1795800000000-AddFolderAlbums`                         | albums     | Adds `album.parentAlbumId`, `album.folderOwnerId`, `album.folderPath` and the `folder_album_sync` table         | See below        |
 
 ## Rolling back to the official v3.4.2 images
 
@@ -90,6 +91,7 @@ Files written to disk by fork features stay on disk.
 | ------------------ | ---------------------------------------------------- | -------- | --------------------------------------------------------------------- |
 | Library "writable" | Administration > External Libraries > library > Edit | off      | Lets fork features write files inside the library's first import path |
 | Start page         | Account Settings > Features > Folders                | Timeline | `navigation.startPage` preference: `timeline` or `folders`            |
+| Folder albums      | Account Settings > Features > Albums                 | on       | `folderAlbums.enabled` preference: mirror every folder as an album    |
 
 The foundation adds no environment variables. Folder uploads add none either; their limits are listed in
 "Reliable folder uploads" below.
@@ -282,6 +284,128 @@ All endpoints need the `asset.upload` permission and only work for libraries the
 sessions. Delete the `.immich-upload-tmp` folders in the import paths of writable libraries afterwards; files that were
 already uploaded stay where they are and remain normal library files.
 
+## Folder albums
+
+### What it adds
+
+- **Every folder is an album.** Each folder that contains photos or videos becomes an album, and every sub-folder
+  becomes a child album inside the album of its parent folder, as deep as the folders go. A folder that only contains
+  sub-folders also gets an album, so the tree has no gaps. Empty folders get no album until something is in them.
+- **Albums page.** The Albums page shows hand-made albums and the top-level folder albums only. Opening a folder album
+  shows breadcrumbs (Albums > parent folders > this folder) with a "go to parent" button, the child albums as cards
+  (cover and number of items, like the Folders view) and then the photos that are directly in that folder.
+- **Marked as folder albums.** Folder albums carry a folder badge ("Folder album") on the album card, in the list
+  view and on the album page, with the number of child albums and the folder path.
+- **Hand-made albums** keep working exactly as before.
+
+### Which folders become albums
+
+A folder is the directory of an asset's original file, the same notion as the Folders view. Folder albums are per
+owner: everyone only gets albums for their own assets. The top-level folder albums ("roots") are:
+
+- every import path of the user's external libraries (writable or read-only), named after the last folder of the
+  path. An asset of a library belongs to the longest import path of that library that contains it; library assets
+  outside every import path are ignored;
+- for uploaded assets (web upload, folder upload, phone backup): the storage template folder
+  `<media>/library/<storage label or user id>`, named after the storage label (or `Library` when the user has none).
+
+Assets in the upload hash folders (`<media>/upload/<user id>/xx/yy`, used when the storage template is off) are not
+mirrored, because these folders are random. **Phone backups show up as folder albums only when the storage template is
+enabled** (Administration > Settings > Storage Template).
+
+An album holds exactly the assets that are directly in its folder and are on the timeline or archived. Trashed,
+hidden (for example the video part of a live photo) and locked assets are not in folder albums; restoring an asset
+from the trash puts it back.
+
+### How they stay in sync
+
+There is nothing to do by hand. A background job (`FolderAlbumSync`, in the background task queue) updates the folder
+albums of a user:
+
+- after uploads (mobile backup, web upload, folder upload, resumable uploads), library scans (new, changed, offline
+  and removed files), metadata extraction and storage template moves, folder management (create, rename, move,
+  delete, file rename), trashing, restoring and deleting assets, and visibility changes. These triggers are batched:
+  at most one run per user every 10 seconds, so a library scan of thousands of files causes a handful of runs, not
+  one job per file;
+- right away when an import path of a library changes, a library is deleted or the user turns folder albums on or off;
+- once when the server starts (this is the one-time backfill for existing photos), nightly with the database
+  cleanup tasks (a full re-check that repairs anything a trigger missed), and on demand: Administration > Jobs >
+  Create job > "Sync folder albums".
+
+Runs are incremental: they only look at assets changed since the previous run (with a 10-minute overlap), plus one
+quick check per folder album. Every run is idempotent and safe to repeat; it never rewrites an album that did not
+change. A folder album whose folder (including all sub-folders) became empty is removed. Renaming or moving a folder
+with folder management keeps the album ids (the album paths are rewritten in the same database transaction as the
+assets), so shares and descriptions survive a rename or move.
+
+### What can be changed on a folder album
+
+- **Managed by the folder (read-only):** the name, the photos in it and its place in the tree. Renaming a folder
+  album (`PATCH /albums/:id` with a different `albumName`) answers `400 Folder albums are named after their folder`,
+  deleting it answers `400`, and adding or removing assets answers `200` with `success: false` and
+  `error: "no_permission"` for every asset (the same shape as for any asset the user may not change, so the mobile app
+  handles it). Folder albums are not offered in the "Add to album" picker of the web app.
+- **Editable like any album:** the description, the cover photo, the sort order and the activity setting.
+- **Sharing:** a folder album can be shared with users (any role) and with shared links exactly like a hand-made
+  album. A share covers that one album only, not its child albums. A shared album whose parent is not shared with you
+  shows up at the top of your Albums page. If a folder becomes empty its album is removed, and with it its shares; a
+  new album (new id) is created when photos arrive in that folder again.
+
+### Settings
+
+- Account Settings > Features > Albums > **Folder albums** (`folderAlbums.enabled` preference, on by default).
+  Turning it off deletes all folder albums of that user (hand-made albums are kept); turning it on again rebuilds them.
+- No environment variables.
+
+### API (all additive)
+
+| Endpoint / field                           | What it is                                                                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /albums?topLevel=true`                | Only albums whose parent album is not available to the user. Without the parameter the list is flat and unchanged (the mobile app uses it like that). |
+| `GET /albums/:id/folder`                   | `{ isFolderAlbum, path?, ancestors: [{ id, albumName }], children: AlbumResponseDto[] }`, permission `album.read`, no shared links                    |
+| `AlbumResponseDto.isFolderAlbum`           | optional boolean                                                                                                                                      |
+| `AlbumResponseDto.parentAlbumId`           | optional, nullable album id (not returned to shared links)                                                                                            |
+| `AlbumResponseDto.childAlbumCount`         | optional number of child albums the user can see                                                                                                      |
+| `UserPreferences*Dto.folderAlbums.enabled` | optional preference                                                                                                                                   |
+| `ManualJobName` `folder-album-sync`        | admin job "Sync folder albums"                                                                                                                        |
+
+No existing field or endpoint changed. The absolute folder path is never sent to clients; `path` in the folder
+response is relative to the parent of the root folder (for example `photos/2024/Trip`) and only returned to the owner.
+
+### Official iPhone app
+
+- Folder albums are ordinary albums for the app: they come through `GET /albums` and the sync stream (albums, album
+  users, album assets) with exactly the same fields as hand-made albums, and deletions arrive as normal album deletes.
+  The app shows them as one flat list (no nesting); intermediate folders show 0 items.
+- The first sync after enabling the feature sends one album-to-asset entry per mirrored photo to every phone, once.
+  On a large library this first phone sync takes longer. Turn the preference off if you do not want folder albums on
+  the phone at all.
+- Auto-backup is not affected: uploads are unchanged and folder albums are updated afterwards in the background.
+- The app's "sync albums" backup option links a device album to a server album with the same name. If such a name
+  belongs to a folder album, assets the app tries to add are refused (`no_permission`) and are not added; rename the
+  device album or the folder to avoid this.
+- Renaming or deleting a folder album in the app is refused with an error message.
+
+### Performance
+
+- Incremental runs read only changed assets (index `asset (ownerId, updateId)`) and do one index probe per folder
+  album; they take milliseconds. Runs are serialised with the database lock `FolderAlbumSync`.
+- Full runs (backfill, nightly, manual, import path changes) group the user's assets by folder once and insert or
+  remove memberships with one statement each: expect a few seconds for 500k assets, and on the very first run about one
+  `album_asset` row per mirrored asset.
+- `GET /albums` without `topLevel` (the mobile app) also counts the assets of every folder album, about half a second
+  to a second and a half at 500k assets. The web app uses `topLevel=true`.
+
+### Migration and rollback
+
+`1795800000000-AddFolderAlbums` adds the nullable columns `album.parentAlbumId` (foreign key to `album`, `ON DELETE SET
+NULL`, indexed), `album.folderOwnerId` (foreign key to `user`) and `album.folderPath`, the partial unique index
+`album_folderOwnerId_folderPath_uq`, the check `album_folder_chk` and the table `folder_album_sync` (sync checkpoint per
+user). Its `down()` (run by `immich-admin revert-fork-migrations`) deletes all folder albums (they are derived from the
+folders and can be rebuilt; the mobile app removes them on its next sync), then drops the table, indexes, constraints
+and columns. Hand-made albums, their photos and their shares are kept, so the official v3.4.2 server starts on an
+unchanged album table.
+
 ## Outbound network calls
 
 The fork must not add hidden network traffic. Every group lists the outbound calls its features make here.
@@ -291,3 +415,4 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
 - Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
   library's import path and the database.
+- Folder albums: none. The sync job only reads and writes the database.
