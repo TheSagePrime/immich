@@ -146,7 +146,56 @@ export class AlbumRepository {
     );
   }
 
-  private buildAlbumBaseQuery(ownerId: string, { isOwned, isShared }: { isOwned?: boolean; isShared?: boolean }) {
+  @GenerateSql({ params: [[DummyValue.UUID], DummyValue.UUID] })
+  @ChunkedArray()
+  async getChildAlbumCounts(ids: string[], userId: string): Promise<{ albumId: string; childAlbumCount: number }[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('album as child')
+      .select((eb) => eb.ref('child.parentAlbumId').$notNull().as('albumId'))
+      .select((eb) => sql<number>`${eb.fn.countAll()}::int`.as('childAlbumCount'))
+      .where('child.parentAlbumId', 'in', ids)
+      .where('child.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('album_user as child_user')
+            .whereRef('child_user.albumId', '=', 'child.id')
+            .where('child_user.userId', '=', userId),
+        ),
+      )
+      .groupBy('child.parentAlbumId')
+      .execute();
+    return rows;
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getFolderAlbumIds(ids: string[]): Promise<string[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db
+      .selectFrom('album')
+      .select('album.id')
+      .where('album.id', 'in', ids)
+      .where('album.folderPath', 'is not', null)
+      .execute();
+    return rows.map(({ id }) => id);
+  }
+
+  private buildAlbumBaseQuery(
+    ownerId: string,
+    {
+      isOwned,
+      isShared,
+      topLevel,
+      parentAlbumId,
+    }: { isOwned?: boolean; isShared?: boolean; topLevel?: boolean; parentAlbumId?: string },
+  ) {
     return this.db
       .selectFrom('album')
       .innerJoin('album_user', (join) =>
@@ -168,13 +217,38 @@ export class AlbumRepository {
           ]);
           return isShared ? isSharedAlbum : eb.not(isSharedAlbum);
         }),
-      );
+      )
+      .$if(topLevel === true, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb('album.parentAlbumId', 'is', null),
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('album_user as parent_user')
+                  .innerJoin('album as parent', 'parent.id', 'parent_user.albumId')
+                  .whereRef('parent_user.albumId', '=', 'album.parentAlbumId')
+                  .where('parent_user.userId', '=', ownerId)
+                  .where('parent.deletedAt', 'is', null),
+              ),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!parentAlbumId, (qb) => qb.where('album.parentAlbumId', '=', parentAlbumId!));
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, { isOwned: true, isShared: true }] })
+  @GenerateSql({ params: [DummyValue.UUID, { isOwned: true, isShared: true, topLevel: true }] })
   getAll(
     ownerId: string,
-    options: { id?: string; isOwned?: boolean; isShared?: boolean; name?: string } = {},
+    options: {
+      id?: string;
+      isOwned?: boolean;
+      isShared?: boolean;
+      name?: string;
+      topLevel?: boolean;
+      parentAlbumId?: string;
+    } = {},
   ): Promise<MapAlbumDto[]> {
     return this.buildAlbumBaseQuery(ownerId, options)
       .selectAll('album')

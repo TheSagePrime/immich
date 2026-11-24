@@ -362,6 +362,8 @@ describe(LibraryService.name, () => {
 
       mocks.assetJob.getForSyncAssets.mockResolvedValue([asset]);
       mocks.storage.stat.mockRejectedValue(new Error('ENOENT, no such file or directory'));
+      const library = factory.library();
+      mocks.library.get.mockResolvedValue(library);
 
       await expect(sut.handleSyncAssets(mockAssetJob)).resolves.toBe(JobStatus.Success);
 
@@ -369,6 +371,9 @@ describe(LibraryService.name, () => {
         isOffline: true,
         deletedAt: expect.anything(),
       });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: library.ownerId, debounce: true } },
+      ]);
     });
 
     it('should set assets deleted from disk as offline', async () => {
@@ -1012,6 +1017,9 @@ describe(LibraryService.name, () => {
         expect.objectContaining({ importPaths: [`${cwd}/foo/bar`] }),
       );
       expect(mocks.event.emit).toHaveBeenCalledWith('LibraryUpdate');
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: library.ownerId, full: true } },
+      ]);
     });
 
     it('should enable writable when the first import path is writable', async () => {
@@ -1335,6 +1343,10 @@ describe(LibraryService.name, () => {
       mocks.library.streamAssetIds.mockReturnValue(makeStream([AssetFactory.create()]));
 
       await expect(sut.handleDeleteLibrary({ id: library.id })).resolves.toBe(JobStatus.Success);
+      expect(mocks.library.get).toHaveBeenCalledWith(library.id, true);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: library.ownerId, full: true } },
+      ]);
     });
   });
 

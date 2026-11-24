@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { FOLDER_ALBUM_SYNC_DELAY_MS, FOLDER_ALBUM_SYNC_OVERLAP_MS } from 'src/constants.js';
+import { FOLDER_ALBUM_SYNC_OVERLAP_MS } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
-import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName} from 'src/enum.js';
+import { DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobOf } from 'src/types.js';
@@ -13,46 +13,14 @@ import {
   diffFolderAlbums,
   getFolderAlbumRootsKey,
   getPrunableFolderAlbumIds,
+  queueFolderAlbumSync,
 } from 'src/utils/folder-album.js';
 import { getPreferences } from 'src/utils/preferences.js';
 
-const LOCAL_THROTTLE_MS = Math.floor(FOLDER_ALBUM_SYNC_DELAY_MS / 2);
-
 @Injectable()
 export class FolderAlbumService extends BaseService {
-  private recentlyQueued = new Map<string, number>();
-
-  async queueSync(userIds: Iterable<string | null | undefined>, options: { full?: boolean } = {}) {
-    const now = Date.now();
-    const items = [];
-    for (const userId of new Set(userIds)) {
-      if (!userId) {
-        continue;
-      }
-
-      if (options.full) {
-        items.push({ name: JobName.FolderAlbumSync as const, data: { userId, full: true } });
-        continue;
-      }
-
-      const last = this.recentlyQueued.get(userId);
-      if (last !== undefined && now - last < LOCAL_THROTTLE_MS) {
-        continue;
-      }
-
-      this.recentlyQueued.set(userId, now);
-      items.push({ name: JobName.FolderAlbumSync as const, data: { userId, debounce: true } });
-    }
-
-    if (this.recentlyQueued.size > 1000) {
-      for (const [userId, time] of this.recentlyQueued) {
-        if (now - time >= LOCAL_THROTTLE_MS) {
-          this.recentlyQueued.delete(userId);
-        }
-      }
-    }
-
-    await this.jobRepository.queueAll(items);
+  queueSync(userIds: Iterable<string | null | undefined>, options: { full?: boolean } = {}) {
+    return queueFolderAlbumSync(this.jobRepository, userIds, options);
   }
 
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })

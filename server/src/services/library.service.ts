@@ -23,6 +23,7 @@ import { AssetSyncResult } from 'src/repositories/library.repository.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { JobOf } from 'src/types.js';
+import { queueFolderAlbumSync } from 'src/utils/folder-album.js';
 import { toExternalAssetInsert } from 'src/utils/library.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, createLibraryMatcher, findOrFail, handlePromiseError } from 'src/utils/misc.js';
@@ -385,6 +386,9 @@ export class LibraryService extends BaseService {
 
     const library = await this.libraryRepository.update(id, dto);
     await this.eventRepository.emit('LibraryUpdate');
+    if (dto.importPaths) {
+      await queueFolderAlbumSync(this.jobRepository, [library.ownerId], { full: true });
+    }
     return mapLibrary(library);
   }
 
@@ -406,6 +410,8 @@ export class LibraryService extends BaseService {
     const libraryId = job.id;
 
     await this.assetRepository.updateByLibraryId(libraryId, { deletedAt: new Date() });
+    const deletedLibrary = await this.libraryRepository.get(libraryId, true);
+    await queueFolderAlbumSync(this.jobRepository, [deletedLibrary?.ownerId], { full: true });
 
     this.logger.debug(`Will delete all assets in library ${libraryId}`);
     let hasAssets = false;
@@ -572,6 +578,16 @@ export class LibraryService extends BaseService {
     }
 
     await Promise.all(promises);
+
+    const statusChanges =
+      assetIdsToOffline.length +
+      trashedAssetIdsToOffline.length +
+      assetIdsToOnline.length +
+      trashedAssetIdsToOnline.length;
+    if (statusChanges > 0) {
+      const library = await this.libraryRepository.get(job.libraryId, true);
+      await queueFolderAlbumSync(this.jobRepository, [library?.ownerId]);
+    }
 
     const remainingCount = assets.length - assetIdsToOffline.length - assetIdsToUpdate.length - assetIdsToOnline.length;
     const cumulativePercentage = ((100 * job.progressCounter) / job.totalAssets).toFixed(1);

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
+import { FOLDER_ALBUM_SYNC_DELAY_MS } from 'src/constants.js';
 import { JobName } from 'src/enum.js';
 import type { JobItem } from 'src/types.js';
 
@@ -238,19 +239,44 @@ export const getPrunableFolderAlbumIds = (
   return albums.filter(({ id }) => !keep.has(id)).map(({ id }) => id);
 };
 
+const recentlyQueued = new Map<string, number>();
+
+export const resetFolderAlbumSyncThrottle = () => recentlyQueued.clear();
+
 export const queueFolderAlbumSync = async (
   jobRepository: { queueAll: (items: JobItem[]) => Promise<void> },
   userIds: Iterable<string | null | undefined>,
   options: { full?: boolean } = {},
 ) => {
+  const now = Date.now();
+  const window = Math.floor(FOLDER_ALBUM_SYNC_DELAY_MS / 2);
   const items: JobItem[] = [];
   for (const userId of new Set(userIds)) {
-    if (userId) {
-      items.push({
-        name: JobName.FolderAlbumSync,
-        data: options.full ? { userId, full: true } : { userId, debounce: true },
-      });
+    if (!userId) {
+      continue;
+    }
+
+    if (options.full) {
+      items.push({ name: JobName.FolderAlbumSync, data: { userId, full: true } });
+      continue;
+    }
+
+    const last = recentlyQueued.get(userId);
+    if (last !== undefined && now - last >= 0 && now - last < window) {
+      continue;
+    }
+
+    recentlyQueued.set(userId, now);
+    items.push({ name: JobName.FolderAlbumSync, data: { userId, debounce: true } });
+  }
+
+  if (recentlyQueued.size > 1000) {
+    for (const [userId, time] of recentlyQueued) {
+      if (now - time >= window) {
+        recentlyQueued.delete(userId);
+      }
     }
   }
+
   await jobRepository.queueAll(items);
 };

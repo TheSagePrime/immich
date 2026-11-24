@@ -154,6 +154,9 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(2);
       expect(mocks.asset.update).toHaveBeenCalledWith({ id: stillAsset.id, originalPath: newStillPicturePath });
       expect(mocks.asset.update).toHaveBeenCalledWith({ id: motionAsset.id, originalPath: newMotionPicturePath });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: stillAsset.ownerId, debounce: true } },
+      ]);
     });
 
     it('should migrate live photo motion video alongside the still image using album in path', async () => {

@@ -419,7 +419,6 @@ export type JobItem =
   | { name: JobName.AuthChallengeCleanup; data?: IBaseJob }
   | { name: JobName.HlsSessionCleanup; data?: IBaseJob }
   | { name: JobName.UploadSessionCleanup; data?: IBaseJob }
-
   | { name: JobName.FolderAlbumSync; data: IFolderAlbumSyncJob }
   | { name: JobName.FolderAlbumSyncQueueAll; data?: IFolderAlbumSyncQueueAllJob }
 

@@ -21,6 +21,7 @@ import { BaseService } from 'src/services/base.service.js';
 import type { JobOf, StorageAsset } from 'src/types.js';
 import { getAssetFile } from 'src/utils/asset.util.js';
 import { getFilenameExtension, getLivePhotoMotionFilename } from 'src/utils/file.js';
+import { queueFolderAlbumSync } from 'src/utils/folder-album.js';
 
 const storageTokens = {
   secondOptions: ['s', 'ss', 'SSS'],
@@ -169,6 +170,7 @@ export class StorageTemplateService extends BaseService {
       const motionFilename = getLivePhotoMotionFilename(filename, livePhotoVideo.originalPath);
       await this.moveAsset(livePhotoVideo, { storageLabel, filename: motionFilename }, asset);
     }
+    await queueFolderAlbumSync(this.jobRepository, [asset.ownerId]);
     return JobStatus.Success;
   }
 
@@ -212,6 +214,11 @@ export class StorageTemplateService extends BaseService {
     this.logger.debug('Cleaning up empty directories...');
     const libraryFolder = StorageCore.getBaseFolder(StorageFolder.Library);
     await this.storageRepository.removeEmptyDirs(libraryFolder);
+
+    await queueFolderAlbumSync(
+      this.jobRepository,
+      users.map(({ id }) => id),
+    );
 
     this.logger.log('Finished storage template migration');
 

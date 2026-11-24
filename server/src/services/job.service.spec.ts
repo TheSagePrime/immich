@@ -1,4 +1,4 @@
-import { AssetType, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { AssetType, ImmichWorker, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum.js';
 import { JobService } from 'src/services/job.service.js';
 import type { JobItem } from 'src/types.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
@@ -17,6 +17,13 @@ describe(JobService.name, () => {
 
   it('should work', () => {
     expect(sut).toBeDefined();
+  });
+
+  describe('create', () => {
+    it('should queue a full folder album sync for all users', async () => {
+      await sut.create({ name: ManualJobName.FolderAlbumSync });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FolderAlbumSyncQueueAll, data: { full: true } });
+    });
   });
 
   describe('onJobRun', () => {
