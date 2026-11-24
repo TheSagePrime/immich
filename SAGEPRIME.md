@@ -248,6 +248,9 @@ existing upload (`POST /assets`, used by the mobile apps) is unchanged.
 - If the server stops while a file is being completed, the session stays "completing". After one hour the next
   complete call (the web app sends one when it resumes the file) takes it over and finishes it; a hard link that was
   already made is recognised, so no numbered copy is created.
+- An existing file or symbolic link at the target name is never written through: it counts as an existing file for the
+  duplicate choice. If a file was stored but importing it as an asset failed (for example a database error), the file
+  is kept, reported as uploaded, and imported by the next library scan.
 - Sessions expire 24 hours after the last received chunk. The `UploadSessionCleanup` job (nightly with the database
   cleanup tasks, and once when the microservices worker starts) deletes expired partial files, finished session rows
   older than 7 days, and `.part` files in `.immich-upload-tmp` of writable libraries that no session knows about.
