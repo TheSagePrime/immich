@@ -445,6 +445,9 @@ assets), so shares and descriptions survive a rename or move.
   deleting it answers `400`, and adding or removing assets answers `200` with `success: false` and
   `error: "no_permission"` for every asset (the same shape as for any asset the user may not change, so the mobile app
   handles it). Folder albums are not offered in the "Add to album" picker of the web app.
+  Files dropped onto a folder album page are uploaded like files dropped anywhere else (to the timeline, or into a
+  writable library with the folder upload dialog) and are not added to that album; they show up in a folder album once
+  their folder is mirrored.
 - **Editable like any album:** the description, the cover photo, the sort order and the activity setting.
 - **Sharing:** a folder album can be shared with users (any role) and with shared links exactly like a hand-made
   album. A share covers that one album only, not its child albums. A shared album whose parent is not shared with you
