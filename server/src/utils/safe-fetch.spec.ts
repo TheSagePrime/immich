@@ -21,6 +21,8 @@ const resolverFor =
     return Promise.resolve(addresses.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })));
   };
 
+const allowLoopback = (resolver?: HostResolver) => createSafeFetch({ allowedHosts: ['127.0.0.1'], resolver });
+
 describe('isPrivateAddress', () => {
   it.each([
     '127.0.0.1',
@@ -100,7 +102,7 @@ describe('OutboundAllowlist', () => {
     expect(allowlist.hasAddress('fd00:1:2::3')).toBe(true);
   });
 
-  it.each(['10.0.0.0/33', 'http://example.com', 'exa mple.com', 'example.com/8'])('should reject %s', (entry) => {
+  it.each(['10.0.0.0/33', 'https://example.com', 'exa mple.com', 'example.com/8'])('should reject %s', (entry) => {
     expect(() => new OutboundAllowlist([entry])).toThrow('Invalid outbound allowlist entry');
   });
 });
@@ -238,8 +240,6 @@ describe('createSafeFetch', () => {
     await new Promise((resolve) => server.close(resolve));
   });
 
-  const allowLoopback = (resolver?: HostResolver) => createSafeFetch({ allowedHosts: ['127.0.0.1'], resolver });
-
   it('should block loopback by default', async () => {
     const safeFetch = createSafeFetch();
     await expect(safeFetch(`http://127.0.0.1:${port}/ok`)).rejects.toBeInstanceOf(OutboundRequestBlockedError);
@@ -256,7 +256,7 @@ describe('createSafeFetch', () => {
     const safeFetch = createSafeFetch();
     await expect(safeFetch('file:///etc/passwd')).rejects.toBeInstanceOf(OutboundRequestBlockedError);
     await expect(safeFetch('ftp://example.com/file')).rejects.toBeInstanceOf(OutboundRequestBlockedError);
-    await expect(safeFetch('http://user:pass@example.com/')).rejects.toBeInstanceOf(OutboundRequestBlockedError);
+    await expect(safeFetch('https://user:pass@example.com/')).rejects.toBeInstanceOf(OutboundRequestBlockedError);
   });
 
   it('should fetch an allowed address and return a regular response', async () => {

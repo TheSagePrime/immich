@@ -27,6 +27,7 @@ import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission 
 import { OAuthConfig, OAuthRawProfile } from 'src/repositories/oauth.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { isGranted } from 'src/utils/access.js';
+import { generateProfileImage } from 'src/utils/profile-image.js';
 import {
   LoginRateLimitConfig,
   TooManyRequestsException,
@@ -34,7 +35,6 @@ import {
   getRetryAfterSeconds,
   normalizeClientIp,
 } from 'src/utils/rate-limit.js';
-import { generateProfileImage } from 'src/utils/profile-image.js';
 import { getUserAgentDetails } from 'src/utils/request.js';
 
 export interface LoginDetails {
@@ -138,17 +138,21 @@ export class AuthService extends BaseService {
     for (const { key, maxFailures } of keys) {
       const failures = await this.loginAttemptRepository.recordFailure(key, now, resetBefore);
       const minutes = getLockoutMinutes(failures, maxFailures, config);
-      if (minutes > 0) {
-        const until = DateTime.fromJSDate(now).plus({ minutes }).toJSDate();
-        await this.loginAttemptRepository.lock(key, until);
-        lockedUntil = lockedUntil && lockedUntil > until ? lockedUntil : until;
+      if (minutes === 0) {
+        continue;
       }
+
+      const until = DateTime.fromJSDate(now).plus({ minutes }).toJSDate();
+      await this.loginAttemptRepository.lock(key, until);
+      lockedUntil = lockedUntil && lockedUntil > until ? lockedUntil : until;
     }
 
-    if (lockedUntil) {
-      this.logger.warn(`Password login locked until ${lockedUntil.toISOString()} after repeated failed attempts`);
-      throw new TooManyRequestsException(LOGIN_RATE_LIMIT_MESSAGE, getRetryAfterSeconds(lockedUntil, now));
+    if (!lockedUntil) {
+      return;
     }
+
+    this.logger.warn(`Password login locked until ${lockedUntil.toISOString()} after repeated failed attempts`);
+    throw new TooManyRequestsException(LOGIN_RATE_LIMIT_MESSAGE, getRetryAfterSeconds(lockedUntil, now));
   }
 
   async logout(auth: AuthDto, authType: AuthType): Promise<LogoutResponseDto> {

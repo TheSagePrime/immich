@@ -1,6 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import { defaults } from 'src/dtos/config.dto.js';
 import { getLockoutMinutes, getRetryAfterSeconds, normalizeClientIp } from 'src/utils/rate-limit.js';
-import { describe, expect, it } from 'vitest';
 
 describe('getLockoutMinutes', () => {
   const config = { ...defaults.passwordLogin.rateLimit, lockoutMinutes: 2, maxLockoutMinutes: 30 };

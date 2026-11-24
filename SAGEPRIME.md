@@ -42,6 +42,7 @@ All fork migrations are newer than the last official `v3.4.2` migration,
 | `1795470129477-AddLibraryWritable`                      | foundation | Adds `library.writable boolean NOT NULL DEFAULT false`                                                          | Drops the column |
 | `1795560000000-AddAssetOwnerIdOriginalPathPatternIndex` | folders    | Adds the index `asset_ownerId_originalPath_pattern_idx` on `asset ("ownerId", "originalPath" text_pattern_ops)` | Drops the index  |
 | `1795600000000-AddUploadSessionTable`                   | uploads    | Adds the `upload_session` table (resumable folder uploads)                                                      | Drops the table  |
+| `1795700000000-AddLoginAttemptTable`                    | security   | Adds the `login_attempt` table (failed password logins per email address and IP address)                        | Drops the table  |
 
 ## Rolling back to the official v3.4.2 images
 
@@ -86,10 +87,12 @@ Files written to disk by fork features stay on disk.
 
 ## Settings and environment variables
 
-| Name               | Where                                                | Default  | Meaning                                                               |
-| ------------------ | ---------------------------------------------------- | -------- | --------------------------------------------------------------------- |
-| Library "writable" | Administration > External Libraries > library > Edit | off      | Lets fork features write files inside the library's first import path |
-| Start page         | Account Settings > Features > Folders                | Timeline | `navigation.startPage` preference: `timeline` or `folders`            |
+| Name                            | Where                                                       | Default  | Meaning                                                                        |
+| ------------------------------- | ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------------ |
+| Library "writable"              | Administration > External Libraries > library > Edit        | off      | Lets fork features write files inside the library's first import path          |
+| Start page                      | Account Settings > Features > Folders                       | Timeline | `navigation.startPage` preference: `timeline` or `folders`                     |
+| Limit failed logins             | Administration > Settings > Authentication > Password Login | on       | `passwordLogin.rateLimit`, see "Security hardening"                            |
+| `IMMICH_OUTBOUND_ALLOWED_HOSTS` | environment variable of `immich-server`                     | empty    | Private hosts and networks the server may still call, see "Security hardening" |
 
 The foundation adds no environment variables. Folder uploads add none either; their limits are listed in
 "Reliable folder uploads" below.
@@ -282,6 +285,104 @@ All endpoints need the `asset.upload` permission and only work for libraries the
 sessions. Delete the `.immich-upload-tmp` folders in the import paths of writable libraries afterwards; files that were
 already uploaded stay where they are and remain normal library files.
 
+## Security hardening
+
+### Outbound requests are guarded against SSRF
+
+Every URL the server fetches on its own goes through `server/src/utils/safe-fetch.ts` instead of the global `fetch`:
+
+- OAuth: discovery, token, userinfo and JWKS requests of the configured issuer (through the `customFetch` hooks of
+  `openid-client` and `jose`), and the download of the `picture` claim when a user logs in with OAuth. A picture
+  embedded as a `data:` URL is still decoded locally.
+- Workflow plugins: the `httpRequest` host function, in addition to the existing `allowedHosts` check of the plugin
+  manifest.
+- The version check (`https://version.immich.cloud`).
+
+The guard resolves the host name once, refuses the request when **any** resolved address is loopback, private
+(RFC 1918), unique local (`fc00::/7`), link local, carrier-grade NAT (`100.64.0.0/10`), unspecified, multicast,
+reserved, documentation or benchmarking space, including IPv4 addresses hidden in IPv4-mapped, NAT64 and 6to4 IPv6
+addresses, and then connects to exactly the address it checked, so a DNS answer that changes between the check and the
+connection (DNS rebinding) cannot redirect it. Redirects are followed by hand (at most 5), every hop is checked again,
+only `http` and `https` are allowed, URLs with credentials are refused and `Authorization` and `Cookie` headers are
+dropped when a redirect leaves the origin.
+
+An OAuth provider (or a plugin target) on the local network needs an explicit allowlist:
+
+```yaml
+services:
+  immich-server:
+    environment:
+      IMMICH_OUTBOUND_ALLOWED_HOSTS: auth.example.lan,10.0.20.0/24
+```
+
+Entries are comma separated: exact host names (`auth.example.lan`), sub-domain wildcards (`*.example.lan`, which does
+not match `example.lan` itself), IP addresses and CIDR ranges. A private address is allowed when the host name or the
+address is listed. The cloud metadata addresses (`169.254.169.254`, `fd00:ec2::254`), unspecified and multicast
+addresses are refused even when they are listed. An invalid entry stops the server at start-up.
+
+Not guarded on purpose, because they are internal services an administrator configures: the machine-learning URLs,
+the SMTP server, the database, Redis and the maintenance health check on localhost.
+
+### Media endpoints and shared links
+
+- `server/src/controllers/index.spec.ts` now also pins the complete list of routes reachable without any credentials
+  (`PUBLIC_ROUTES`) and checks that every media route (thumbnail, preview, original, video playback, HLS playlists and
+  segments, downloads, asset files, person thumbnails, profile images) needs a session, an API key or a shared link.
+- `e2e/src/specs/server/api/media-auth.e2e-spec.ts` runs every media endpoint against: no credentials, invalid
+  token, invalid shared-link key, another user, the owner, an API key without the permission, a shared link for a
+  different asset, a shared link of another user, a password protected link without its password, an album link
+  inside and outside its album, and a link without download permission (originals and downloads are refused,
+  thumbnails stay visible). It also covers asset-file downloads, person thumbnails, profile images and album or
+  timeline download info.
+- Gaps found and fixed:
+  - an asset that was shared with an individual shared link and later moved to the locked folder was still served to
+    that link (thumbnail, original, metadata, and listed in `GET /shared-links/me`). Locked assets are now excluded
+    from shared-link access and from the assets of a link;
+  - `GET /assets/:id/video/stream/:sessionId/...` did not check that the streaming session belongs to the asset in
+    the URL, so someone with access to one asset could ask for the segments of another streaming session of the same
+    owner if they knew its random id. The session must now belong to that asset (also for ending a session).
+- By design (unchanged): any signed-in user can load any user's profile image, and a shared link key in the request
+  replaces the session of a signed-in user for that request.
+
+### Login rate limiting
+
+`POST /auth/login` (password login, used by the web and the mobile apps) is limited per email address and per client
+IP address. The state is stored in the `login_attempt` table, so it is shared by all API workers and survives
+restarts. Settings: Administration > Settings > Authentication > Password Login (`passwordLogin.rateLimit`):
+
+| Setting              | Default | Meaning                                                                               |
+| -------------------- | ------- | ------------------------------------------------------------------------------------- |
+| `enabled`            | `true`  | Turns the limit on or off                                                             |
+| `accountMaxFailures` | `5`     | Failed logins for one email address before it is locked                               |
+| `ipMaxFailures`      | `30`    | Failed logins from one IP address (IPv6: per `/64`) before it is locked; `0` disables |
+| `windowMinutes`      | `15`    | The count starts over when nothing failed for this long after the last failure/lock   |
+| `lockoutMinutes`     | `1`     | First lockout                                                                         |
+| `maxLockoutMinutes`  | `60`    | The lockout doubles with every further failure up to this                             |
+
+- While locked, the server answers `429 Too Many Requests` with a `Retry-After` header (seconds) without checking the
+  password, so even the correct password is refused until the lockout ends. The failure that reaches the limit is
+  already answered with 429.
+- Unknown email addresses are counted exactly like existing ones, so the answers do not reveal whether an account
+  exists. Email addresses and IP addresses are stored only as SHA-256 hashes.
+- A successful login resets the count of the email address (not of the IP address).
+- Already signed-in apps are not affected: the mobile app's auto-backup uses its session token and never calls the
+  login endpoint. OAuth, passkey and API-key logins are not limited.
+- Expired rows are removed by the nightly session cleanup job.
+- An attacker who knows an email address can keep that account locked for password logins. With the defaults a
+  lockout lasts at most an hour and OAuth or passkey login still work.
+- **Behind a reverse proxy**, Immich only sees the real client address when the proxy is trusted. The default trusts
+  loopback, link-local and unique-local addresses; for a proxy on a Docker bridge network (for example `172.18.0.0/16`)
+  set `IMMICH_TRUSTED_PROXIES`. Otherwise every request seems to come from the proxy and the IP limit applies to all
+  clients together (set `ipMaxFailures` to `0` in that case). For more protection, also rate limit `/api/auth/login`
+  in the reverse proxy.
+
+There was no per-IP limit before. There is still no general request rate limit; use the reverse proxy for that.
+
+### Rollback
+
+`immich-admin revert-fork-migrations` also reverts `1795700000000-AddLoginAttemptTable`. The `passwordLogin.rateLimit`
+and `IMMICH_OUTBOUND_ALLOWED_HOSTS` settings are ignored by the official image.
+
 ## Outbound network calls
 
 The fork must not add hidden network traffic. Every group lists the outbound calls its features make here.
@@ -291,3 +392,5 @@ The fork must not add hidden network traffic. Every group lists the outbound cal
 - Folders first: none. Folder summaries and folder management only read the database and the library folders.
 - Reliable folder uploads: none. The browser only talks to the Immich server, and the server only writes to the
   library's import path and the database.
+- Security hardening: none new. The SSRF guard only restricts the existing calls listed in "Outbound requests are
+  guarded against SSRF" (OAuth provider, OAuth profile picture, workflow plugin `httpRequest`, version check).

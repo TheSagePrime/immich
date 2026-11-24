@@ -43,6 +43,16 @@ const setup = (db?: Kysely<DB>) => {
   });
 };
 
+const details = (clientIp: string) => ({ ...mediumFactory.loginDetails(), clientIp });
+
+const createUser = async (ctx: ReturnType<typeof setup>['ctx']) => {
+  const { user } = await ctx.newUser({ password: await hash('password', 4) });
+  return user;
+};
+
+const fail = (sut: AuthService, email: string, clientIp: string) =>
+  sut.login({ email, password: 'wrong-password' }, details(clientIp)).catch((error) => error);
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
@@ -97,19 +107,9 @@ describe(AuthService.name, () => {
   });
 
   describe('login rate limiting', () => {
-    const details = (clientIp: string) => ({ ...mediumFactory.loginDetails(), clientIp });
-
-    const createUser = async (ctx: ReturnType<typeof setup>['ctx'], password: string) => {
-      const { user } = await ctx.newUser({ password: await hash(password, 4) });
-      return user;
-    };
-
-    const fail = (sut: AuthService, email: string, clientIp: string) =>
-      sut.login({ email, password: 'wrong-password' }, details(clientIp)).catch((error) => error);
-
     it('should lock an account after 5 failures, even for the correct password', async () => {
       const { sut, ctx } = setup();
-      const user = await createUser(ctx, 'password');
+      const user = await createUser(ctx);
 
       for (let i = 0; i < 4; i++) {
         await expect(fail(sut, user.email, '198.51.100.1')).resolves.toHaveProperty('status', 401);
@@ -140,7 +140,7 @@ describe(AuthService.name, () => {
 
     it('should reset the account counter after a successful login', async () => {
       const { sut, ctx } = setup();
-      const user = await createUser(ctx, 'password');
+      const user = await createUser(ctx);
 
       for (let i = 0; i < 4; i++) {
         await fail(sut, user.email, '198.51.100.4');
@@ -156,7 +156,7 @@ describe(AuthService.name, () => {
 
     it('should double the lockout when failures continue after it expired', async () => {
       const { sut, ctx } = setup();
-      const user = await createUser(ctx, 'password');
+      const user = await createUser(ctx);
       const db = ctx.database;
 
       for (let i = 0; i < 5; i++) {
@@ -176,7 +176,7 @@ describe(AuthService.name, () => {
 
     it('should start over once the window has passed', async () => {
       const { sut, ctx } = setup();
-      const user = await createUser(ctx, 'password');
+      const user = await createUser(ctx);
       const repository = ctx.get(LoginAttemptRepository);
 
       for (let i = 0; i < 4; i++) {
@@ -210,7 +210,7 @@ describe(AuthService.name, () => {
       });
 
       try {
-        const user = await createUser(ctx, 'password');
+        const user = await createUser(ctx);
         await expect(fail(sut, 'spray-1@immich.cloud', '203.0.113.7')).resolves.toHaveProperty('status', 401);
         await expect(fail(sut, 'spray-2@immich.cloud', '203.0.113.7')).resolves.toHaveProperty('status', 401);
         await expect(fail(sut, 'spray-3@immich.cloud', '203.0.113.7')).resolves.toHaveProperty('status', 429);

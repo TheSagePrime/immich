@@ -1,13 +1,13 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { SALT_ROUNDS } from 'src/constants.js';
-import { defaults } from 'src/dtos/config.dto.js';
 import { UserAdmin } from 'src/database.js';
 import { AuthDto, SignUpDto } from 'src/dtos/auth.dto.js';
+import { defaults } from 'src/dtos/config.dto.js';
 import { AuthType, Permission } from 'src/enum.js';
 import { AuthService } from 'src/services/auth.service.js';
-import { TooManyRequestsException } from 'src/utils/rate-limit.js';
 import type { UserMetadataItem } from 'src/types.js';
+import { TooManyRequestsException } from 'src/utils/rate-limit.js';
 import { ApiKeyFactory } from 'test/factories/api-key.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { OAuthProfileFactory } from 'test/factories/oauth-profile.factory.js';
@@ -21,6 +21,7 @@ import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const email = 'test@immich.com';
 const defaultsRateLimit = defaults.passwordLogin.rateLimit;
+const decode = (key: string) => Buffer.from(key, 'hex').toString();
 const loginDetails = {
   isSecure: true,
   clientIp: '127.0.0.1',
@@ -93,10 +94,6 @@ describe(AuthService.name, () => {
     });
 
     describe('rate limiting', () => {
-      const decode = (key: string) => Buffer.from(key, 'hex').toString();
-      const withRateLimit = (rateLimit: Record<string, unknown>) =>
-        mocks.systemMetadata.get.mockResolvedValue({ passwordLogin: { enabled: true, rateLimit } });
-
       it('should reject a locked account before checking the password', async () => {
         const lockedUntil = new Date(Date.now() + 90_000);
         mocks.loginAttempt.getLocked.mockResolvedValue([{ key: 'key', failures: 5, lockedUntil }]);
@@ -201,7 +198,9 @@ describe(AuthService.name, () => {
       });
 
       it('should skip the ip limit when it is set to 0', async () => {
-        withRateLimit({ ...defaultsRateLimit, ipMaxFailures: 0 });
+        mocks.systemMetadata.get.mockResolvedValue({
+          passwordLogin: { enabled: true, rateLimit: { ...defaultsRateLimit, ipMaxFailures: 0 } },
+        });
         mocks.user.getByEmail.mockResolvedValue(void 0);
 
         await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
@@ -211,7 +210,9 @@ describe(AuthService.name, () => {
       });
 
       it('should do nothing when rate limiting is disabled', async () => {
-        withRateLimit({ ...defaultsRateLimit, enabled: false });
+        mocks.systemMetadata.get.mockResolvedValue({
+          passwordLogin: { enabled: true, rateLimit: { ...defaultsRateLimit, enabled: false } },
+        });
         mocks.user.getByEmail.mockResolvedValue(void 0);
 
         await expect(sut.login(dto, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);

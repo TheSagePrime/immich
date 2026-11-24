@@ -90,6 +90,14 @@ const CROSS_ORIGIN_STRIPPED_HEADERS = ['authorization', 'cookie', 'proxy-authori
 const DEFAULT_MAX_REDIRECTS = 5;
 const DEFAULT_TIMEOUT = 30_000;
 
+const parseGroups = (part: string) =>
+  part
+    ? part
+        .split(':')
+        .filter((group) => group !== '')
+        .map((group) => Number.parseInt(group, 16))
+    : [];
+
 export const parseIpv6 = (address: string): number[] | undefined => {
   if (isIP(address) !== 6) {
     return;
@@ -111,9 +119,8 @@ export const parseIpv6 = (address: string): number[] | undefined => {
   }
 
   const [head, rest] = value.includes('::') ? value.split('::') : [value, undefined];
-  const parse = (part: string) => (part ? part.split(':').filter((group) => group !== '') : []);
-  const headGroups = parse(head).map((group) => Number.parseInt(group, 16));
-  const restGroups = rest === undefined ? [] : parse(rest).map((group) => Number.parseInt(group, 16));
+  const headGroups = parseGroups(head);
+  const restGroups = rest === undefined ? [] : parseGroups(rest);
   const total = 8 - tail.length;
   const zeros = rest === undefined ? 0 : total - headGroups.length - restGroups.length;
   const groups = [...headGroups, ...Array.from({ length: Math.max(zeros, 0) }, () => 0), ...restGroups, ...tail];
@@ -178,13 +185,17 @@ export class OutboundAllowlist {
         continue;
       }
 
-      const [address, prefix] = entry.split('/');
+      const [address, prefix, extra] = entry.split('/', 3);
+      if (extra !== undefined) {
+        throw new Error(`Invalid outbound allowlist entry: ${raw}`);
+      }
+
       const plain = stripBrackets(address);
       const family = isIP(plain);
       if (family) {
         const bits = prefix === undefined ? (family === 4 ? 32 : 128) : Number(prefix);
         const max = family === 4 ? 32 : 128;
-        if (!Number.isInteger(bits) || bits < 0 || bits > max) {
+        if (!Number.isSafeInteger(bits) || bits < 0 || bits > max) {
           throw new Error(`Invalid outbound allowlist entry: ${raw}`);
         }
         this.networks.addSubnet(plain, bits, family === 4 ? 'ipv4' : 'ipv6');
@@ -315,9 +326,7 @@ const toBuffer = async (body: RequestInit['body'] | undefined, headers: Headers)
 };
 
 const decode = (response: IncomingMessage): Readable => {
-  const encoding = String(response.headers['content-encoding'] ?? '')
-    .trim()
-    .toLowerCase();
+  const encoding = (response.headers['content-encoding'] ?? '').trim().toLowerCase();
   switch (encoding) {
     case 'gzip':
     case 'x-gzip': {
@@ -361,8 +370,7 @@ const toResponse = (message: IncomingMessage, url: URL, method: string, redirect
   }
 
   const response = new Response(body, { status, statusText: message.statusMessage, headers });
-  Object.defineProperty(response, 'url', { value: url.href });
-  Object.defineProperty(response, 'redirected', { value: redirected });
+  Object.defineProperties(response, { url: { value: url.href }, redirected: { value: redirected } });
   return response;
 };
 
@@ -371,10 +379,7 @@ type Hop = { url: URL; method: string; headers: Headers; body?: Buffer; signal: 
 const send = (hop: Hop, target: ResolvedAddress) =>
   new Promise<IncomingMessage>((resolve, reject) => {
     const transport = hop.url.protocol === 'https:' ? https : http;
-    const headers: Record<string, string> = {};
-    for (const [key, value] of hop.headers) {
-      headers[key] = value;
-    }
+    const headers: Record<string, string> = Object.fromEntries(hop.headers);
     if (hop.body) {
       headers['content-length'] = String(hop.body.length);
     }
