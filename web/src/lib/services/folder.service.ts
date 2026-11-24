@@ -11,16 +11,21 @@ import {
   renameFolderMutation,
 } from '#lib/queries/folder.query.ts';
 import { getFolderSummaryQuery } from '#lib/queries/view.query.ts';
+import { handleDownloadAsset } from '#lib/services/asset.service.ts';
+import { downloadArchive } from '#lib/utils/asset-utils.ts';
 import { openFolderPicker, toFolderUploadEntries } from '#lib/utils/chunked-upload.ts';
+import type { FolderCard } from '#lib/utils/folder-cards.ts';
 import { findLibraryRootPath, getFolderName, getRelativeFolderPath, splitFileName } from '#lib/utils/folder-utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
-import type { FolderBulkFailureDto } from '@immich/sdk';
+import type { AssetResponseDto, FolderBulkFailureDto } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiDeleteOutline,
+  mdiDownload,
   mdiFileEditOutline,
   mdiFolderEditOutline,
   mdiFolderMoveOutline,
+  mdiFolderOpenOutline,
   mdiFolderPlusOutline,
   mdiFolderUploadOutline,
 } from '@mdi/js';
@@ -103,6 +108,10 @@ export const handleMoveSelection = async (selection: FolderSelection, initialPat
     return;
   }
 
+  return handleMoveSelectionTo(selection, destination, onChanged);
+};
+
+export const handleMoveSelectionTo = async (selection: FolderSelection, destination: string, onChanged?: OnChanged) => {
   const result = await executeMutation(moveFolderItemsMutation, [
     {
       folderMoveDto: {
@@ -256,3 +265,135 @@ export const getFolderAssetActions = (
 
   return { RenameFile };
 };
+
+export type FolderMenuItem = {
+  id: string;
+  title: string;
+  icon: string;
+  color?: 'danger';
+  disabled?: boolean;
+  hint?: string;
+  onAction: () => unknown;
+};
+
+type FolderMenuContext = {
+  writable: boolean;
+  onOpen: () => unknown;
+  onChanged?: OnChanged;
+  libraryId?: string;
+  selection: FolderSelection;
+};
+
+const guardWrite = ($t: MessageFormatter, writable: boolean, item: FolderMenuItem): FolderMenuItem =>
+  writable ? item : { ...item, disabled: true, hint: $t('read_only_library') };
+
+export const handleDownloadFolder = (name: string, folderPath: string) =>
+  downloadArchive(`${name}.zip`, { folderPath });
+
+export const getFolderCardMenuItems = (
+  $t: MessageFormatter,
+  card: FolderCard,
+  { writable, onOpen, onChanged, libraryId, selection }: FolderMenuContext,
+): FolderMenuItem[] => {
+  const path = card.folderPath;
+  const canWrite = writable && card.writable && !!path;
+  const items: FolderMenuItem[] = [{ id: 'open', title: $t('open'), icon: mdiFolderOpenOutline, onAction: onOpen }];
+
+  items.push(
+    guardWrite($t, canWrite, {
+      id: 'new-folder',
+      title: $t('new_folder'),
+      icon: mdiFolderPlusOutline,
+      onAction: () => path && handleCreateFolder(path, onChanged),
+    }),
+  );
+
+  if (card.kind === 'folder' && path) {
+    items.push(
+      guardWrite($t, canWrite, {
+        id: 'rename',
+        title: $t('rename'),
+        icon: mdiFolderEditOutline,
+        onAction: () => handleRenameFolder(path, onChanged),
+      }),
+      guardWrite($t, canWrite, {
+        id: 'move',
+        title: $t('move_to_folder'),
+        icon: mdiFolderMoveOutline,
+        onAction: () => handleMoveSelection(selection, undefined, onChanged),
+      }),
+      guardWrite($t, canWrite, {
+        id: 'delete',
+        title: $t('delete'),
+        icon: mdiDeleteOutline,
+        color: 'danger',
+        onAction: () => handleDeleteSelection(selection, onChanged),
+      }),
+    );
+  }
+
+  items.push(
+    guardWrite($t, canWrite, {
+      id: 'upload',
+      title: $t('upload_folder_here'),
+      icon: mdiFolderUploadOutline,
+      onAction: () => path && handleUploadIntoFolder(path, libraryId),
+    }),
+  );
+
+  if (path) {
+    items.push({
+      id: 'download',
+      title: $t('download'),
+      icon: mdiDownload,
+      onAction: () => handleDownloadFolder(card.label, path),
+    });
+  }
+
+  return items;
+};
+
+export const getFolderAssetMenuItems = (
+  $t: MessageFormatter,
+  asset: AssetResponseDto,
+  { writable, onOpen, onChanged, libraryId, selection, currentPath }: FolderMenuContext & { currentPath?: string },
+): FolderMenuItem[] => [
+  { id: 'open', title: $t('open'), icon: mdiFolderOpenOutline, onAction: onOpen },
+  guardWrite($t, writable && !!currentPath, {
+    id: 'new-folder',
+    title: $t('new_folder'),
+    icon: mdiFolderPlusOutline,
+    onAction: () => currentPath && handleCreateFolder(currentPath, onChanged),
+  }),
+  guardWrite($t, writable, {
+    id: 'rename',
+    title: $t('rename'),
+    icon: mdiFileEditOutline,
+    onAction: () => handleRenameFile(asset, onChanged),
+  }),
+  guardWrite($t, writable, {
+    id: 'move',
+    title: $t('move_to_folder'),
+    icon: mdiFolderMoveOutline,
+    onAction: () => handleMoveSelection(selection, currentPath, onChanged),
+  }),
+  guardWrite($t, writable, {
+    id: 'delete',
+    title: $t('delete'),
+    icon: mdiDeleteOutline,
+    color: 'danger',
+    onAction: () => handleDeleteSelection(selection, onChanged),
+  }),
+  guardWrite($t, writable && !!currentPath, {
+    id: 'upload',
+    title: $t('upload_folder_here'),
+    icon: mdiFolderUploadOutline,
+    onAction: () => currentPath && handleUploadIntoFolder(currentPath, libraryId),
+  }),
+  {
+    id: 'download',
+    title: $t('download'),
+    icon: mdiDownload,
+    onAction: () => handleDownloadAsset(asset, { edited: false }),
+  },
+];

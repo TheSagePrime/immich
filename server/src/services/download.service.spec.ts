@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { vitest } from 'vitest';
 import { DownloadResponseDto } from 'src/dtos/download.dto.js';
@@ -281,6 +281,29 @@ describe(DownloadService.name, () => {
       await expect(sut.getDownloadInfo(authStub.admin, { assetIds })).resolves.toEqual(downloadResponse);
 
       expect(mocks.downloadRepository.downloadAssetIds).toHaveBeenCalledWith(['asset-1', 'asset-2']);
+    });
+
+    it('should return a list of archives (folderPath)', async () => {
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.downloadRepository.downloadFolder.mockReturnValue(
+        makeStream([
+          { id: 'asset-1', livePhotoVideoId: null, size: 100_000 },
+          { id: 'asset-2', livePhotoVideoId: null, size: 5000 },
+        ]),
+      );
+
+      await expect(sut.getDownloadInfo(authStub.admin, { folderPath: '/photos/trip/' })).resolves.toEqual(
+        downloadResponse,
+      );
+
+      expect(mocks.downloadRepository.downloadFolder).toHaveBeenCalledWith(authStub.admin.user.id, '/photos/trip');
+    });
+
+    it('should not download a folder through a shared link', async () => {
+      await expect(sut.getDownloadInfo(authStub.adminSharedLink, { folderPath: '/photos' })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(mocks.downloadRepository.downloadFolder).not.toHaveBeenCalled();
     });
 
     it('should return a list of archives (albumId)', async () => {

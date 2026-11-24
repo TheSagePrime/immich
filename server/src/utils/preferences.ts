@@ -1,6 +1,6 @@
 import { get, isEqual, set } from 'lodash-es';
 import { UserPreferencesUpdateDto } from 'src/dtos/user-preferences.dto.js';
-import { AssetOrder, PersonUpdateStrategy, StartPage, UserMetadataKey } from 'src/enum.js';
+import { AssetOrder, FolderSortBy, PersonUpdateStrategy, StartPage, UserMetadataKey } from 'src/enum.js';
 import type { DeepPartial, UserMetadataItem, UserPreferences } from 'src/types.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getKeysDeep } from 'src/utils/misc.js';
@@ -13,6 +13,9 @@ const getDefaultPreferences = (): UserPreferences => {
     folders: {
       enabled: true,
       sidebarWeb: true,
+      sortBy: FolderSortBy.Name,
+      sortOrder: AssetOrder.Asc,
+      sortOverrides: [],
     },
     navigation: {
       startPage: StartPage.Timeline,

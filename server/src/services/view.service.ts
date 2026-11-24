@@ -1,9 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { posix } from 'node:path';
+import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
-import { FolderSummaryItemDto, FolderSummaryQueryDto, FolderSummaryResponseDto } from 'src/dtos/folder.dto.js';
+import {
+  FolderRootDto,
+  FolderSummaryItemDto,
+  FolderSummaryQueryDto,
+  FolderSummaryResponseDto,
+} from 'src/dtos/folder.dto.js';
+import { StorageFolder } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
+import { asDateTimeString } from 'src/utils/date.js';
+import { FolderUploadLocation, buildFolderRoots } from 'src/utils/folder-roots.js';
+import { compareNatural } from 'src/utils/natural-sort.js';
 import { isPathInside, resolveSafePath } from 'src/utils/safe-path.js';
 import {
   canManageLibrary,
@@ -17,6 +27,25 @@ import {
 export class ViewService extends BaseService {
   getUniqueOriginalPaths(auth: AuthDto): Promise<string[]> {
     return this.viewRepository.getUniqueOriginalPaths(auth.user.id);
+  }
+
+  async getFolderRoots(auth: AuthDto): Promise<FolderRootDto[]> {
+    const [directories, libraries, user] = await Promise.all([
+      this.viewRepository.getFolderDirectories(auth.user.id),
+      this.libraryRepository.getAll(),
+      this.userRepository.get(auth.user.id, {}),
+    ]);
+
+    const libraryFolder = StorageCore.getBaseFolder(StorageFolder.Library);
+    const uploadLocations: FolderUploadLocation[] = [
+      { name: 'library', path: posix.join(libraryFolder, auth.user.id) },
+      { name: 'upload', path: StorageCore.getFolderLocation(StorageFolder.Upload, auth.user.id) },
+    ];
+    if (user?.storageLabel) {
+      uploadLocations.push({ name: 'library', path: posix.join(libraryFolder, user.storageLabel) });
+    }
+
+    return buildFolderRoots({ auth, libraries, directories, uploadLocations });
   }
 
   async getAssetsByOriginalPath(auth: AuthDto, path: string): Promise<AssetResponseDto[]> {
@@ -45,6 +74,11 @@ export class ViewService extends BaseService {
         path: posix.join(path, row.name),
         assetCount: row.assetCount,
         coverAssetId: row.coverAssetId,
+        newestTakenAt: asDateTimeString(row.newestTakenAt),
+        oldestTakenAt: asDateTimeString(row.oldestTakenAt),
+        newestAddedAt: asDateTimeString(row.newestAddedAt),
+        oldestAddedAt: asDateTimeString(row.oldestAddedAt),
+        totalSize: row.totalSize,
       });
     }
 
@@ -78,7 +112,7 @@ export class ViewService extends BaseService {
       children: children
         .values()
         .toArray()
-        .toSorted((a, b) => a.name.localeCompare(b.name)),
+        .toSorted((a, b) => compareNatural(a.name, b.name)),
       writable: !!match,
       libraryId: match?.library.id,
       isLibraryRoot: match?.root === path,

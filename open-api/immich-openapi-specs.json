@@ -18934,6 +18934,50 @@
         "x-immich-state": "Stable"
       }
     },
+    "/view/folder/roots": {
+      "get": {
+        "description": "Retrieve the top level of the folder view: one root per library with assets of the user (or writable library the user manages), plus one root for the assets uploaded to Immich.",
+        "operationId": "getFolderRoots",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderRootDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve folder roots",
+        "tags": [
+          "Views"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v3",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "folder.read"
+      }
+    },
     "/view/folder/summary": {
       "get": {
         "description": "Retrieve the child folders of a folder with their asset count and cover asset, plus the number of assets directly inside the folder.",
@@ -23771,6 +23815,12 @@
             },
             "type": "array"
           },
+          "folderPath": {
+            "description": "Folder to download, including its subfolders (only assets of the current user)",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
           "userId": {
             "description": "User ID to download assets from",
             "format": "uuid",
@@ -24459,6 +24509,117 @@
         ],
         "type": "object"
       },
+      "FolderRootDto": {
+        "properties": {
+          "assetCount": {
+            "description": "Number of assets in the root",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "coverAssetId": {
+            "description": "Newest asset in the root, used as its cover",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "folders": {
+            "description": "Top level folders of the root",
+            "items": {
+              "$ref": "#/components/schemas/FolderRootFolderDto"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Library ID, or \"uploads\" for the assets uploaded to Immich",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FolderRootKind"
+          },
+          "name": {
+            "description": "Library name, or \"Uploads\"",
+            "type": "string"
+          },
+          "writable": {
+            "description": "Whether any folder of the root can be managed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assetCount",
+          "coverAssetId",
+          "folders",
+          "id",
+          "kind",
+          "name",
+          "writable"
+        ],
+        "type": "object"
+      },
+      "FolderRootFolderDto": {
+        "properties": {
+          "name": {
+            "description": "Display name of the folder inside the root",
+            "type": "string"
+          },
+          "path": {
+            "description": "Absolute folder path, as returned by the other folder endpoints",
+            "type": "string"
+          },
+          "writable": {
+            "description": "Whether the folder can be managed (inside a writable library)",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "writable"
+        ],
+        "type": "object"
+      },
+      "FolderRootKind": {
+        "description": "Folder root kind",
+        "enum": [
+          "library",
+          "uploads"
+        ],
+        "type": "string"
+      },
+      "FolderSortBy": {
+        "description": "Sort key for the folders and assets of a folder",
+        "enum": [
+          "name",
+          "dateTaken",
+          "dateAdded",
+          "fileSize"
+        ],
+        "type": "string"
+      },
+      "FolderSortOverride": {
+        "properties": {
+          "path": {
+            "description": "Folder path",
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sortBy": {
+            "$ref": "#/components/schemas/FolderSortBy"
+          },
+          "sortOrder": {
+            "$ref": "#/components/schemas/AssetOrder"
+          }
+        },
+        "required": [
+          "path",
+          "sortBy",
+          "sortOrder"
+        ],
+        "type": "object"
+      },
       "FolderSummaryItemDto": {
         "properties": {
           "assetCount": {
@@ -24478,9 +24639,39 @@
             "description": "Child folder name",
             "type": "string"
           },
+          "newestAddedAt": {
+            "description": "Newest date added (createdAt) of the assets in the child folder",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "newestTakenAt": {
+            "description": "Newest date taken (fileCreatedAt) of the assets in the child folder",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "oldestAddedAt": {
+            "description": "Oldest date added (createdAt) of the assets in the child folder",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "oldestTakenAt": {
+            "description": "Oldest date taken (fileCreatedAt) of the assets in the child folder",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
           "path": {
             "description": "Absolute child folder path",
             "type": "string"
+          },
+          "totalSize": {
+            "description": "Total file size in bytes of the assets in the child folder",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -24543,6 +24734,19 @@
           "sidebarWeb": {
             "description": "Whether folders appear in web sidebar",
             "type": "boolean"
+          },
+          "sortBy": {
+            "$ref": "#/components/schemas/FolderSortBy"
+          },
+          "sortOrder": {
+            "$ref": "#/components/schemas/AssetOrder"
+          },
+          "sortOverrides": {
+            "description": "Sort chosen for individual folders",
+            "items": {
+              "$ref": "#/components/schemas/FolderSortOverride"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -24560,6 +24764,20 @@
           "sidebarWeb": {
             "description": "Whether folders appear in web sidebar",
             "type": "boolean"
+          },
+          "sortBy": {
+            "$ref": "#/components/schemas/FolderSortBy"
+          },
+          "sortOrder": {
+            "$ref": "#/components/schemas/AssetOrder"
+          },
+          "sortOverrides": {
+            "description": "Sort chosen for individual folders, replaces the stored list",
+            "items": {
+              "$ref": "#/components/schemas/FolderSortOverride"
+            },
+            "maxItems": 500,
+            "type": "array"
           }
         },
         "type": "object"

@@ -35,6 +35,7 @@ import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
 import { CryptoRepository } from 'src/repositories/crypto.repository.js';
 import { DatabaseRepository } from 'src/repositories/database.repository.js';
+import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
@@ -549,6 +550,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case LoginAttemptRepository:
     case UserRepository:
     case VersionHistoryRepository:
+    case DownloadRepository:
     case ViewRepository:
     case WorkflowRepository: {
       return new key(db) as InstanceType<T>;

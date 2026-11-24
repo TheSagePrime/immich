@@ -107,10 +107,10 @@ test.describe('folders', () => {
     await expect(cards.first().getByTestId('folder-count')).toHaveText('items_count');
 
     await cards.first().getByRole('button').first().click();
-    await expect(page).toHaveURL(Route.folders({ path: '/library/2024/summer' }));
+    await expect(page).toHaveURL(Route.folders({ root: 'library-library', path: '2024/summer' }));
 
     await page.getByRole('link', { name: '2024', exact: true }).click();
-    await expect(page).toHaveURL(Route.folders({ path: '/library/2024' }));
+    await expect(page).toHaveURL(Route.folders({ root: 'library-library', path: '2024' }));
   });
 
   test('hides management controls outside of writable libraries', async ({ page, data }) => {
@@ -121,7 +121,7 @@ test.describe('folders', () => {
 
     await page.goto(Route.folders({ path: '/library' }));
     await expect(page.getByTestId('folder-card')).toHaveCount(1);
-    await expect(page.getByRole('button', { name: 'new_folder' })).toHaveCount(0);
+    await expect(page.getByTestId('new-folder-button')).toBeDisabled();
     await expect(page.getByRole('button', { name: 'select_folders' })).toHaveCount(0);
   });
 
@@ -149,10 +149,10 @@ test.describe('folders', () => {
     await page.getByRole('checkbox', { name: 'select_folder' }).first().click();
     await page.getByRole('button', { name: 'move_to_folder' }).click();
     const picker = page.getByRole('dialog');
-    await expect(picker.getByTestId('folder-picker-path')).toHaveText('/library');
+    await expect(picker.getByTestId('folder-picker-path')).toHaveText('library');
     await expect(picker.getByRole('listitem').getByRole('button', { name: 'b', exact: true })).toBeDisabled();
     await picker.getByRole('listitem').getByRole('button', { name: 'c', exact: true }).click();
-    await expect(picker.getByTestId('folder-picker-path')).toHaveText('/library/c');
+    await expect(picker.getByTestId('folder-picker-path')).toHaveText('library › c');
     await picker.getByRole('button', { name: 'move_here' }).click();
     expect(api.moveFolderItems).toHaveBeenCalledWith({
       body: { destination: '/library/c', folderPaths: ['/library/b'] },

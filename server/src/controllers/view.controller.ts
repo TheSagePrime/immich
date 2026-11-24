@@ -3,7 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
-import { FolderSummaryQueryDto, FolderSummaryResponseDto } from 'src/dtos/folder.dto.js';
+import { FolderRootDto, FolderSummaryQueryDto, FolderSummaryResponseDto } from 'src/dtos/folder.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import { Auth, Authenticated } from 'src/middleware/auth.guard.js';
 import { ViewService } from 'src/services/view.service.js';
@@ -22,6 +22,18 @@ export class ViewController {
   })
   getUniqueOriginalPaths(@Auth() auth: AuthDto): Promise<string[]> {
     return this.service.getUniqueOriginalPaths(auth);
+  }
+
+  @Get('folder/roots')
+  @Authenticated({ permission: Permission.FolderRead })
+  @Endpoint({
+    summary: 'Retrieve folder roots',
+    description:
+      'Retrieve the top level of the folder view: one root per library with assets of the user (or writable library the user manages), plus one root for the assets uploaded to Immich.',
+    history: new HistoryBuilder().added('v3'),
+  })
+  getFolderRoots(@Auth() auth: AuthDto): Promise<FolderRootDto[]> {
+    return this.service.getFolderRoots(auth);
   }
 
   @Get('folder/summary')

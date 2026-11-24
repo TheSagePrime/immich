@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import sanitize from 'sanitize-filename';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AuthDto, isEditedOnly } from 'src/dtos/auth.dto.js';
@@ -14,6 +14,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getFileNameWithoutExtension, getFilenameExtension } from 'src/utils/file.js';
 import { getPreferences } from 'src/utils/preferences.js';
+import { normalizeFolderPath } from 'src/utils/writable-library.js';
 
 @Injectable()
 export class DownloadService extends BaseService {
@@ -32,8 +33,13 @@ export class DownloadService extends BaseService {
       const userId = dto.userId;
       await this.requireAccess({ auth, permission: Permission.TimelineDownload, ids: [userId] });
       assets = this.downloadRepository.downloadUserId(userId);
+    } else if (dto.folderPath) {
+      if (auth.sharedLink) {
+        throw new ForbiddenException('Folders cannot be downloaded through a shared link');
+      }
+      assets = this.downloadRepository.downloadFolder(auth.user.id, normalizeFolderPath(dto.folderPath));
     } else {
-      throw new BadRequestException('assetIds, albumId, or userId is required');
+      throw new BadRequestException('assetIds, albumId, userId or folderPath is required');
     }
 
     const targetSize = dto.archiveSize || HumanReadableSize.GiB * 4;

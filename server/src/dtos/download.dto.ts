@@ -6,6 +6,14 @@ const DownloadInfoSchema = z
     assetIds: z.array(z.uuidv4()).optional().describe('Asset IDs to download'),
     albumId: z.uuidv4().optional().describe('Album ID to download'),
     userId: z.uuidv4().optional().describe('User ID to download assets from'),
+    folderPath: z
+      .string()
+      .min(1)
+      .max(4096)
+      .refine((value) => value.startsWith('/'), 'Path must be absolute')
+      .refine((value) => !value.includes('\0'), 'Path must not contain NUL bytes')
+      .optional()
+      .describe('Folder to download, including its subfolders (only assets of the current user)'),
     archiveSize: z.int().min(1).optional().describe('Archive size limit in bytes'),
   })
   .meta({ id: 'DownloadInfoDto' });

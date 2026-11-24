@@ -19,6 +19,7 @@ import {
   DvProfile,
   DvSignalCompatibility,
   ExifOrientation,
+  FolderSortBy,
   H264Profile,
   HevcProfile,
   ImageFormat,
@@ -572,6 +573,12 @@ export interface SystemMetadata extends Record<SystemMetadataKey, Record<string,
   [SystemMetadataKey.IntegrityChecksumCheckpoint]: { date?: string };
 }
 
+export type FolderSortOverride = {
+  path: string;
+  sortBy: FolderSortBy;
+  sortOrder: AssetOrder;
+};
+
 export type UserPreferences = {
   albums: {
     defaultAssetOrder: AssetOrder;
@@ -579,6 +586,9 @@ export type UserPreferences = {
   folders: {
     enabled: boolean;
     sidebarWeb: boolean;
+    sortBy: FolderSortBy;
+    sortOrder: AssetOrder;
+    sortOverrides: FolderSortOverride[];
   };
   navigation: {
     startPage: StartPage;

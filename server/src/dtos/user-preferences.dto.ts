@@ -1,6 +1,12 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
-import { AssetOrderSchema, PersonUpdateStrategySchema, StartPageSchema, UserAvatarColorSchema } from 'src/enum.js';
+import {
+  AssetOrderSchema,
+  FolderSortBySchema,
+  PersonUpdateStrategySchema,
+  StartPageSchema,
+  UserAvatarColorSchema,
+} from 'src/enum.js';
 import type { UserPreferences } from 'src/types.js';
 
 const AlbumsUpdateSchema = z
@@ -34,10 +40,32 @@ const RatingsUpdateSchema = z
   .optional()
   .meta({ id: 'RatingsUpdate' });
 
+export const FOLDER_SORT_OVERRIDES_MAX = 500;
+
+const FolderSortOverrideSchema = z
+  .object({
+    path: z
+      .string()
+      .min(1)
+      .max(4096)
+      .refine((value) => !value.includes('\0'), 'Path must not contain NUL bytes')
+      .describe('Folder path'),
+    sortBy: FolderSortBySchema,
+    sortOrder: AssetOrderSchema,
+  })
+  .meta({ id: 'FolderSortOverride' });
+
 const FoldersUpdateSchema = z
   .object({
     enabled: z.boolean().optional().describe('Whether folders are enabled'),
     sidebarWeb: z.boolean().optional().describe('Whether folders appear in web sidebar'),
+    sortBy: FolderSortBySchema.optional(),
+    sortOrder: AssetOrderSchema.optional(),
+    sortOverrides: z
+      .array(FolderSortOverrideSchema)
+      .max(FOLDER_SORT_OVERRIDES_MAX)
+      .optional()
+      .describe('Sort chosen for individual folders, replaces the stored list'),
   })
   .optional()
   .meta({ id: 'FoldersUpdate' });
@@ -153,6 +181,9 @@ const FoldersResponseSchema = z
   .object({
     enabled: z.boolean().describe('Whether folders are enabled'),
     sidebarWeb: z.boolean().describe('Whether folders appear in web sidebar'),
+    sortBy: FolderSortBySchema.optional(),
+    sortOrder: AssetOrderSchema.optional(),
+    sortOverrides: z.array(FolderSortOverrideSchema).optional().describe('Sort chosen for individual folders'),
   })
   .meta({ id: 'FoldersResponse' });
 
