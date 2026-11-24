@@ -212,6 +212,16 @@ export type ConcurrentQueueName = Exclude<
 export type Jobs = { [K in JobItem['name']]: (JobItem & { name: K })['data'] };
 export type JobOf<T extends JobName> = Jobs[T];
 
+export interface IFolderAlbumSyncJob {
+  userId: string;
+  full?: boolean;
+  debounce?: boolean;
+}
+
+export interface IFolderAlbumSyncQueueAllJob {
+  full?: boolean;
+}
+
 export interface IBaseJob {
   force?: boolean;
 }
@@ -409,6 +419,8 @@ export type JobItem =
   | { name: JobName.AuthChallengeCleanup; data?: IBaseJob }
   | { name: JobName.HlsSessionCleanup; data?: IBaseJob }
   | { name: JobName.UploadSessionCleanup; data?: IBaseJob }
+  | { name: JobName.FolderAlbumSync; data: IFolderAlbumSyncJob }
+  | { name: JobName.FolderAlbumSyncQueueAll; data?: IFolderAlbumSyncQueueAllJob }
 
   // Tags
   | { name: JobName.TagCleanup; data?: IBaseJob }
@@ -570,6 +582,9 @@ export type UserPreferences = {
   };
   navigation: {
     startPage: StartPage;
+  };
+  folderAlbums: {
+    enabled: boolean;
   };
   memories: {
     enabled: boolean;

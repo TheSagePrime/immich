@@ -26,6 +26,7 @@ import { DownloadRepository } from 'src/repositories/download.repository.js';
 import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EmailRepository } from 'src/repositories/email.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
+import { FolderAlbumRepository } from 'src/repositories/folder-album.repository.js';
 import { IntegrityRepository } from 'src/repositories/integrity.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
@@ -102,6 +103,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FolderAlbumRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
@@ -170,6 +172,7 @@ export class BaseService {
     protected duplicateRepository: DuplicateRepository,
     protected emailRepository: EmailRepository,
     protected eventRepository: EventRepository,
+    protected folderAlbumRepository: FolderAlbumRepository,
     protected integrityRepository: IntegrityRepository,
     protected jobRepository: JobRepository,
     protected libraryRepository: LibraryRepository,
@@ -247,6 +250,7 @@ export class BaseService {
       ctx.duplicateRepository,
       ctx.emailRepository,
       ctx.eventRepository,
+      ctx.folderAlbumRepository,
       ctx.integrityRepository,
       ctx.jobRepository,
       ctx.libraryRepository,

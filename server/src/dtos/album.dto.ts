@@ -106,6 +106,10 @@ const GetAlbumsSchema = z
       .optional()
       .describe('Filter by shared status: true = only shared, false = not shared, undefined = no filter'),
     assetId: z.uuidv4().optional().describe('Filter albums containing this asset ID (ignores other parameters)'),
+    topLevel: stringToBool
+      .optional()
+      .describe('Only return albums whose parent album is not available to the user (hides nested folder albums)')
+      .meta(new HistoryBuilder().added('v3').getExtensions()),
   })
   .meta({ id: 'GetAlbumsDto' });
 
@@ -188,8 +192,43 @@ export const AlbumResponseSchema = z
     isActivityEnabled: z.boolean().describe('Activity feed enabled'),
     order: AssetOrderSchema.optional(),
     contributorCounts: z.array(ContributorCountResponseSchema).optional(),
+    isFolderAlbum: z
+      .boolean()
+      .optional()
+      .describe('Whether the album mirrors a folder. Its name and assets are managed automatically.')
+      .meta(new HistoryBuilder().added('v3').getExtensions()),
+    parentAlbumId: z
+      .uuidv4()
+      .nullable()
+      .optional()
+      .describe('Parent folder album ID')
+      .meta(new HistoryBuilder().added('v3').getExtensions()),
+    childAlbumCount: z
+      .int()
+      .min(0)
+      .optional()
+      .describe('Number of child albums available to the user')
+      .meta(new HistoryBuilder().added('v3').getExtensions()),
   })
   .meta({ id: 'AlbumResponseDto' });
+
+const AlbumFolderAncestorSchema = z
+  .object({
+    id: z.uuidv4().describe('Album ID'),
+    albumName: z.string().describe('Album name'),
+  })
+  .meta({ id: 'AlbumFolderAncestorDto' });
+
+const AlbumFolderResponseSchema = z
+  .object({
+    isFolderAlbum: z.boolean().describe('Whether the album mirrors a folder'),
+    path: z.string().optional().describe('Folder path relative to the parent of its root folder (owner only)'),
+    ancestors: z
+      .array(AlbumFolderAncestorSchema)
+      .describe('Parent albums from the top-level album down to the direct parent, as far as the user can access them'),
+    children: z.array(AlbumResponseSchema).describe('Child albums available to the user, sorted by name'),
+  })
+  .meta({ id: 'AlbumFolderResponseDto' });
 
 const AlbumUserParamSchema = z.object({
   id: z.uuidv4().describe('Album ID'),
@@ -214,6 +253,7 @@ export class GetAlbumsDto extends createZodDto(GetAlbumsSchema) {}
 export class AlbumStatisticsResponseDto extends createZodDto(AlbumStatisticsResponseSchema) {}
 export class UpdateAlbumUserDto extends createZodDto(UpdateAlbumUserSchema) {}
 export class AlbumResponseDto extends createZodDto(AlbumResponseSchema) {}
+export class AlbumFolderResponseDto extends createZodDto(AlbumFolderResponseSchema) {}
 class AlbumUserResponseDto extends createZodDto(AlbumUserResponseSchema) {}
 
 export type MapAlbumDto = {
@@ -228,6 +268,10 @@ export type MapAlbumDto = {
   id: string;
   isActivityEnabled: boolean;
   order: AssetOrder;
+  parentAlbumId?: string | null;
+  folderPath?: string | null;
+  folderOwnerId?: string | null;
+  childAlbumCount?: number;
 };
 
 export const mapAlbum = (entity: MaybeDehydrated<MapAlbumDto>, { auth }: { auth?: AuthDto } = {}): AlbumResponseDto => {
@@ -271,5 +315,8 @@ export const mapAlbum = (entity: MaybeDehydrated<MapAlbumDto>, { auth }: { auth?
     assetCount: entity.assets?.length || 0,
     isActivityEnabled: entity.isActivityEnabled,
     order: entity.order,
+    isFolderAlbum: !!entity.folderPath,
+    parentAlbumId: auth?.sharedLink ? undefined : (entity.parentAlbumId ?? null),
+    childAlbumCount: auth?.sharedLink ? undefined : entity.childAlbumCount,
   };
 };

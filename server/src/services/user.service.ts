@@ -19,6 +19,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { getCalendarHeatmap } from 'src/services/shared/user-methods.js';
 import type { JobOf, UserMetadataItem } from 'src/types.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
+import { queueFolderAlbumSync } from 'src/utils/folder-album.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
@@ -86,12 +87,17 @@ export class UserService extends BaseService {
 
   async updateMyPreferences(auth: AuthDto, dto: UserPreferencesUpdateDto) {
     const metadata = await this.userRepository.getMetadata(auth.user.id);
+    const wasEnabled = getPreferences(metadata).folderAlbums.enabled;
     const updated = mergePreferences(getPreferences(metadata), dto);
 
     await this.userRepository.upsertMetadata(auth.user.id, {
       key: UserMetadataKey.Preferences,
       value: getPreferencesPartial(updated),
     });
+
+    if (wasEnabled !== updated.folderAlbums.enabled) {
+      await queueFolderAlbumSync(this.jobRepository, [auth.user.id], { full: true });
+    }
 
     return mapPreferences(updated);
   }

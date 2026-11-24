@@ -11,6 +11,7 @@ import {
   ReactionType,
   type ActivityResponseDto,
   type AdminConfigDto,
+  type AlbumFolderResponseDto,
   type AlbumResponseDto,
   type AssetBulkUpdateDto,
   type AssetOcrResponseDto,
@@ -504,10 +505,48 @@ export class MockData {
       }));
   }
 
-  albumList(assetId?: string) {
+  albumList(assetId?: string, { topLevel }: { topLevel?: boolean } = {}) {
     return [...this.albums.keys()]
       .filter((albumId) => assetId === undefined || this.albumAssets.get(albumId)?.has(assetId))
-      .map((albumId) => this.getAlbum(albumId)!);
+      .filter((albumId) => {
+        const parentAlbumId = this.albums.get(albumId)?.parentAlbumId;
+        return !topLevel || !parentAlbumId || !this.albums.has(parentAlbumId);
+      })
+      .map((albumId) => this.withChildAlbumCount(this.getAlbum(albumId)!));
+  }
+
+  albumFolder(albumId: string): AlbumFolderResponseDto | undefined {
+    const album = this.albums.get(albumId);
+    if (!album) {
+      return;
+    }
+    if (!album.isFolderAlbum) {
+      return { isFolderAlbum: false, ancestors: [], children: [] };
+    }
+
+    const ancestors: AlbumFolderResponseDto['ancestors'] = [];
+    let parent = album.parentAlbumId ? this.albums.get(album.parentAlbumId) : undefined;
+    while (parent) {
+      ancestors.unshift({ id: parent.id, albumName: parent.albumName });
+      parent = parent.parentAlbumId ? this.albums.get(parent.parentAlbumId) : undefined;
+    }
+
+    const children = [...this.albums.values()]
+      .filter((child) => child.parentAlbumId === albumId)
+      .map((child) => this.withChildAlbumCount(this.getAlbum(child.id)!))
+      .sort((a, b) => a.albumName.localeCompare(b.albumName));
+
+    return {
+      isFolderAlbum: true,
+      path: [...ancestors.map(({ albumName }) => albumName), album.albumName].join('/'),
+      ancestors,
+      children,
+    };
+  }
+
+  private withChildAlbumCount(album: AlbumResponseDto): AlbumResponseDto {
+    const childAlbumCount = [...this.albums.values()].filter((child) => child.parentAlbumId === album.id).length;
+    return { ...album, childAlbumCount };
   }
 
   sampleAssets(count: number, seed = 1) {

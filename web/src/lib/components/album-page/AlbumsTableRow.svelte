@@ -7,7 +7,7 @@
   import { locale } from '#lib/stores/preferences.store.ts';
   import { AlbumUserRole, type AlbumResponseDto } from '@immich/sdk';
   import { Icon, menuManager } from '@immich/ui';
-  import { mdiShareVariantOutline } from '@mdi/js';
+  import { mdiFolderOutline, mdiShareVariantOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { goto } from '$app/navigation';
 
@@ -48,6 +48,11 @@
 >
   <td class="text-md w-8/12 items-center text-start text-ellipsis sm:w-4/12 md:w-4/12 xl:w-[30%] 2xl:w-[40%]">
     {album.albumName}
+    {#if album.isFolderAlbum}
+      <span data-testid="folder-album-badge">
+        <Icon icon={mdiFolderOutline} size="16" class="ms-1 inline text-primary" title={$t('folder_album')} />
+      </span>
+    {/if}
     {#if album.shared}
       <Icon
         icon={mdiShareVariantOutline}

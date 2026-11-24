@@ -1,8 +1,10 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   ForeignKeyColumn,
+  Index,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
@@ -12,9 +14,17 @@ import {
 import { UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { AssetOrder } from 'src/enum.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
+import { UserTable } from 'src/schema/tables/user.table.js';
 
 @Table({ name: 'album' })
 @UpdatedAtTrigger('album_updatedAt')
+@Index({
+  name: 'album_folderOwnerId_folderPath_uq',
+  columns: ['folderOwnerId', 'folderPath'],
+  unique: true,
+  where: '"folderPath" IS NOT NULL',
+})
+@Check({ name: 'album_folder_chk', expression: '("folderPath" IS NULL) = ("folderOwnerId" IS NULL)' })
 export class AlbumTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
@@ -50,4 +60,13 @@ export class AlbumTable {
 
   @UpdateIdColumn({ index: true })
   updateId!: Generated<string>;
+
+  @ForeignKeyColumn(() => AlbumTable, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE', index: true })
+  parentAlbumId!: string | null;
+
+  @ForeignKeyColumn(() => UserTable, { nullable: true, onDelete: 'CASCADE', onUpdate: 'CASCADE', index: false })
+  folderOwnerId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  folderPath!: string | null;
 }

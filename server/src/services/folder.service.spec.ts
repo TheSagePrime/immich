@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException } from '@nes
 import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AssetStatus, DatabaseLock } from 'src/enum.js';
+import { AssetStatus, DatabaseLock, JobName } from 'src/enum.js';
 import { FolderService } from 'src/services/folder.service.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { factory, newUuid } from 'test/small.factory.js';
@@ -167,6 +167,9 @@ describe(FolderService.name, () => {
         expect.any(Function),
       );
       expect(mocks.storage.rename).toHaveBeenCalledWith(join(root, 'a'), join(root, 'renamed'));
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: authStub.user1.user.id, debounce: true } },
+      ]);
     });
 
     it('should refuse to rename the library folder', async () => {
@@ -483,6 +486,9 @@ describe(FolderService.name, () => {
         assetIds: [asset.id],
         userId: authStub.user1.user.id,
       });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: authStub.user1.user.id, debounce: true } },
+      ]);
       expect(mocks.storage.unlink).not.toHaveBeenCalled();
     });
 

@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import {
   AddUsersDto,
+  AlbumFolderResponseDto,
   AlbumResponseDto,
   AlbumStatisticsResponseDto,
   AlbumUserParamDto,
@@ -97,6 +98,18 @@ export class AlbumController {
   })
   deleteAlbum(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto) {
     return this.service.delete(auth, id);
+  }
+
+  @Authenticated({ permission: Permission.AlbumRead })
+  @Get(':id/folder')
+  @Endpoint({
+    summary: 'Retrieve the folder of an album',
+    description:
+      'Retrieve the parent albums (breadcrumbs) and the child albums of a folder album. Hand-made albums return no parents and no children.',
+    history: new HistoryBuilder().added('v3'),
+  })
+  getAlbumFolder(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<AlbumFolderResponseDto> {
+    return this.service.getFolder(auth, id);
   }
 
   @Authenticated({ permission: Permission.AlbumRead, sharedLink: true })

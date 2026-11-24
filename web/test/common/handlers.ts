@@ -32,6 +32,17 @@ export const createHandlers = (data: MockData): Handlers => {
     getSupportedMediaTypes: () => ({ json: data.mediaTypes }),
     getMyUser: () => ({ json: data.user }),
     getMyPreferences: () => ({ json: data.getPreferences() }),
+    updateMyPreferences: ({ body }) => {
+      const current = data.getPreferences();
+      const updated = Object.fromEntries(
+        Object.entries({ ...current, ...body }).map(([key, value]) => [
+          key,
+          { ...(current as Record<string, object>)[key], ...(value as object) },
+        ]),
+      ) as typeof current;
+      data.setPreferences(updated);
+      return { json: updated };
+    },
     getNotifications: () => ({ json: data.notifications }),
     searchUsersAdmin: ({ params = {} }) => ({ json: data.userList(params) }),
     createUserAdmin: ({ body }) => ({ status: 201, json: data.createUser(body) }),
@@ -127,7 +138,11 @@ export const createHandlers = (data: MockData): Handlers => {
       return stack ? { json: stack } : notFound;
     },
 
-    getAllAlbums: ({ params = {} }) => ({ json: data.albumList(params.assetId) }),
+    getAllAlbums: ({ params = {} }) => ({ json: data.albumList(params.assetId, { topLevel: params.topLevel }) }),
+    getAlbumFolder: ({ params }) => {
+      const folder = data.albumFolder(params.id);
+      return folder ? { json: folder } : notFound;
+    },
     createAlbum: ({ body }) => ({ status: 201, json: data.createAlbum(body) }),
     deleteAlbum: ({ params }) => {
       data.deleteAlbum(params.id);

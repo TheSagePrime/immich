@@ -412,7 +412,10 @@ describe(AssetService.name, () => {
       expect(mocks.asset.updateAll).toHaveBeenCalledWith([asset1.id, asset2.id], {
         visibility: AssetVisibility.Archive,
       });
-      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: auth.user.id, debounce: true } },
+      ]);
       expect(mocks.websocket.clientSend).toHaveBeenCalledTimes(2);
     });
 

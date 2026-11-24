@@ -106,7 +106,7 @@ export const getAssetBulkActions = ($t: MessageFormatter, album?: AlbumResponseD
     title: $t('remove_from_album'),
     icon: mdiImageRemoveOutline,
     shortcuts: [{ key: 'l', shift: true }],
-    $if: () => !!album && (isAlbumOwner || assetMultiSelectManager.isAllUserOwned),
+    $if: () => !!album && !album.isFolderAlbum && (isAlbumOwner || assetMultiSelectManager.isAllUserOwned),
     onAction: () => handleBulkRemoveAssetsFromAlbum(assetIds, album!),
   };
 
@@ -272,7 +272,7 @@ export const getAssetActions = (
     title: $t('remove_from_album'),
     icon: mdiImageRemoveOutline,
     shortcuts: [{ key: 'l', shift: true }],
-    $if: () => !!album && (isOwner || isAlbumOwner),
+    $if: () => !!album && !album.isFolderAlbum && (isOwner || isAlbumOwner),
     onAction: () => handleRemoveAssetsFromAlbum([asset.id], album!),
   };
 

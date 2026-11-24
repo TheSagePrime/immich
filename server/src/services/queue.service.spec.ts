@@ -44,6 +44,7 @@ describe(QueueService.name, () => {
         { name: JobName.AuthChallengeCleanup },
         { name: JobName.HlsSessionCleanup },
         { name: JobName.UploadSessionCleanup },
+        { name: JobName.FolderAlbumSyncQueueAll, data: { full: true } },
         { name: JobName.AuditTableCleanup },
         { name: JobName.MemoryGenerate },
         { name: JobName.UserSyncUsage },

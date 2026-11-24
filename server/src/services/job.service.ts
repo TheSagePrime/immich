@@ -70,6 +70,10 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
       return { name: JobName.IntegrityDeleteReportType, data: { type: IntegrityReport.ChecksumFail } };
     }
 
+    case ManualJobName.FolderAlbumSync: {
+      return { name: JobName.FolderAlbumSyncQueueAll, data: { full: true } };
+    }
+
     default: {
       throw new BadRequestException('Invalid job name');
     }

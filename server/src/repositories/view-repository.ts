@@ -249,6 +249,25 @@ export class ViewRepository {
             and "asset_file"."type" = ${AssetFileType.Sidecar}
             and "asset_file"."path" like ${`${escapeLikePattern(from)}%`}
         `.execute(trx);
+
+        await sql`
+          delete from "album"
+          using "library"
+          where
+            "library"."id" = ${folder.libraryId}::uuid
+            and "album"."folderOwnerId" = "library"."ownerId"
+            and ("album"."folderPath" = ${folder.to}::text or "album"."folderPath" like ${`${escapeLikePattern(to)}%`})
+        `.execute(trx);
+
+        await sql`
+          update "album"
+          set "folderPath" = ${folder.to}::text || substr("album"."folderPath", length(${folder.from}::text) + 1)
+          from "library"
+          where
+            "library"."id" = ${folder.libraryId}::uuid
+            and "album"."folderOwnerId" = "library"."ownerId"
+            and ("album"."folderPath" = ${folder.from}::text or "album"."folderPath" like ${`${escapeLikePattern(from)}%`})
+        `.execute(trx);
       }
 
       for (const sidecar of changes.sidecars) {

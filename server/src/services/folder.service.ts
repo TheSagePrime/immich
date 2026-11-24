@@ -25,6 +25,7 @@ import {
 import { AssetStatus, DatabaseLock, Permission } from 'src/enum.js';
 import { AssetPathRewrite, LibraryAssetPath, SidecarPathRewrite } from 'src/repositories/view-repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import { queueFolderAlbumSync } from 'src/utils/folder-album.js';
 import { isPathInside, parseSafeName, resolveSafePath } from 'src/utils/safe-path.js';
 import {
   canManageLibrary,
@@ -123,6 +124,7 @@ export class FolderService extends BaseService {
       const path = normalizeFolderPath(dto.path);
       const name = this.validateName(dto.name);
       const newPath = await this.moveFolder(libraries, path, posix.dirname(path), name);
+      await this.queueFolderAlbumSync(libraries);
       return { path: newPath };
     });
   }
@@ -144,6 +146,7 @@ export class FolderService extends BaseService {
       }
 
       const originalPath = await this.moveAsset(libraries, asset, posix.dirname(asset.originalPath), name);
+      await this.queueFolderAlbumSync(libraries);
       return { id, originalPath, originalFileName: posix.basename(originalPath) };
     });
   }
@@ -173,6 +176,10 @@ export class FolderService extends BaseService {
         } catch (error) {
           result.failed.push({ assetId: asset.id, reason: this.toFailureReason(error, `move asset ${asset.id}`) });
         }
+      }
+
+      if (result.moved > 0) {
+        await this.queueFolderAlbumSync(libraries);
       }
 
       return result;
@@ -236,6 +243,7 @@ export class FolderService extends BaseService {
           assetIds: deletedIds,
           userId: auth.user.id,
         });
+        await this.queueFolderAlbumSync(libraries);
       }
 
       return {
@@ -245,6 +253,13 @@ export class FolderService extends BaseService {
         failed,
       };
     });
+  }
+
+  private queueFolderAlbumSync(libraries: Library[]) {
+    return queueFolderAlbumSync(
+      this.jobRepository,
+      libraries.map(({ ownerId }) => ownerId),
+    );
   }
 
   private withLock<T>(callback: () => Promise<T>): Promise<T> {

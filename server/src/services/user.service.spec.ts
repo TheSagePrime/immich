@@ -27,6 +27,34 @@ describe(UserService.name, () => {
     );
   });
 
+  describe('updateMyPreferences', () => {
+    it('should queue a full folder album sync when folder albums are turned off', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.user.upsertMetadata.mockResolvedValue();
+
+      await sut.updateMyPreferences(auth, { folderAlbums: { enabled: false } });
+
+      expect(mocks.user.upsertMetadata).toHaveBeenCalledWith(auth.user.id, {
+        key: UserMetadataKey.Preferences,
+        value: { folderAlbums: { enabled: false } },
+      });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.FolderAlbumSync, data: { userId: auth.user.id, full: true } },
+      ]);
+    });
+
+    it('should not queue a sync when folder albums did not change', async () => {
+      const auth = AuthFactory.create();
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.user.upsertMetadata.mockResolvedValue();
+
+      await sut.updateMyPreferences(auth, { folderAlbums: { enabled: true } });
+
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getAll', () => {
     it('admin should get all users', async () => {
       const user = UserFactory.create();

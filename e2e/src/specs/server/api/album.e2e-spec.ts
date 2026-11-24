@@ -502,6 +502,9 @@ describe('/albums', () => {
         assetCount: 0,
         isActivityEnabled: true,
         order: AssetOrder.Desc,
+        isFolderAlbum: false,
+        parentAlbumId: null,
+        childAlbumCount: 0,
       });
     });
 

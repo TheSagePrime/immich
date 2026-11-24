@@ -50,6 +50,7 @@ import {
 } from 'src/utils/asset.util.js';
 import { updateLockedColumns } from 'src/utils/database.js';
 import { extractTimeZone } from 'src/utils/date.js';
+import { queueFolderAlbumSync } from 'src/utils/folder-album.js';
 import { batched, findOrFail } from 'src/utils/misc.js';
 import { transformOcrBoundingBox } from 'src/utils/transform.js';
 
@@ -116,6 +117,10 @@ export class AssetService extends BaseService {
       throw new BadRequestException('Asset not found');
     }
 
+    if (rest.visibility !== undefined) {
+      await queueFolderAlbumSync(this.jobRepository, [asset.ownerId]);
+    }
+
     if (!wroteMetadata) {
       this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
     }
@@ -174,6 +179,10 @@ export class AssetService extends BaseService {
 
     if (visibility === AssetVisibility.Locked) {
       await this.albumRepository.removeAssetsFromAll(ids);
+    }
+
+    if (visibility !== undefined) {
+      await queueFolderAlbumSync(this.jobRepository, [auth.user.id]);
     }
 
     if (shouldWriteSidecar) {

@@ -78,7 +78,7 @@ export const getAlbumActions = ($t: MessageFormatter, album: AlbumResponseDto) =
   const Delete: ActionItem = {
     title: $t('delete_album'),
     icon: mdiTrashCanOutline,
-    $if: () => isOwned,
+    $if: () => isOwned && !album.isFolderAlbum,
     onAction: () => handleDeleteAlbum(album),
   };
 
@@ -92,7 +92,7 @@ export const getAlbumActions = ($t: MessageFormatter, album: AlbumResponseDto) =
   const Edit: ActionItem = {
     title: $t('edit_album'),
     icon: mdiRenameOutline,
-    $if: () => isEditor,
+    $if: () => isEditor && !album.isFolderAlbum,
     onAction: () => modalManager.show(AlbumEditModal, { album }),
   };
 
@@ -135,7 +135,7 @@ export const getAlbumAssetsActions = ($t: MessageFormatter, album: AlbumResponse
     title: $t('add_assets'),
     color: 'primary',
     icon: mdiPlusBoxOutline,
-    $if: () => assets.length > 0,
+    $if: () => assets.length > 0 && !album.isFolderAlbum,
     onAction: () =>
       executeMutation(addAssetsToAlbumsMutation, { albumIds: [album.id], assetIds: assets.map(({ id }) => id) }),
   };
@@ -144,6 +144,7 @@ export const getAlbumAssetsActions = ($t: MessageFormatter, album: AlbumResponse
     title: $t('select_from_computer'),
     description: $t('album_upload_assets'),
     icon: mdiUpload,
+    $if: () => !album.isFolderAlbum,
     onAction: () => void openFileUploadDialog({ albumId: album.id }),
   };
 
