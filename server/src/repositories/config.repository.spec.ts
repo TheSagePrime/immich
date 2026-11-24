@@ -14,6 +14,7 @@ const resetEnv = () => {
     'IMMICH_WORKERS_INCLUDE',
     'IMMICH_WORKERS_EXCLUDE',
     'IMMICH_TRUSTED_PROXIES',
+    'IMMICH_CONTENT_SECURITY_POLICY',
     'IMMICH_API_METRICS_PORT',
     'IMMICH_MEDIA_LOCATION',
     'IMMICH_MICROSERVICES_METRICS_PORT',
@@ -257,6 +258,17 @@ describe('getEnv', () => {
     it('should throw error for invalid workers', () => {
       process.env.IMMICH_WORKERS_INCLUDE = 'api,microservices,randomservice';
       expect(getEnv).toThrowError('Invalid worker(s) found: api,microservices,randomservice');
+    });
+  });
+
+  describe('security', () => {
+    it('should enable the content security policy by default', () => {
+      expect(getEnv().security).toEqual({ contentSecurityPolicy: true });
+    });
+
+    it('should allow turning the content security policy off', () => {
+      process.env.IMMICH_CONTENT_SECURITY_POLICY = 'false';
+      expect(getEnv().security).toEqual({ contentSecurityPolicy: false });
     });
   });
 

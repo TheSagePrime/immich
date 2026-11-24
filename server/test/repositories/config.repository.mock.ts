@@ -51,6 +51,10 @@ export const envData: EnvData = {
     trustedProxies: [],
   },
 
+  security: {
+    contentSecurityPolicy: true,
+  },
+
   otel: {
     metrics: {
       hostMetrics: false,

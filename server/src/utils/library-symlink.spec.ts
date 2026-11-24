@@ -76,7 +76,10 @@ describe(createSymlinkEscapeChecker.name, () => {
   });
 
   it('should resolve each directory only once', async () => {
-    const counting = { lstat: vi.fn(lstat), realpath: vi.fn(realpath) };
+    const counting = {
+      lstat: vi.fn((path: string) => lstat(path)),
+      realpath: vi.fn((path: string) => realpath(path)),
+    };
     const isEscaping = createSymlinkEscapeChecker(counting, [root]);
     await writeFile(join(root, 'album/second.jpg'), 'd');
 
