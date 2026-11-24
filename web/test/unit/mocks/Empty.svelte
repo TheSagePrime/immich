@@ -1,1 +1,5 @@
-<div data-testid="mock-component"></div>
+<script lang="ts">
+  const testId = 'mock-component';
+</script>
+
+<div data-testid={testId}></div>
