@@ -104,9 +104,7 @@ describe(AuthController.name, () => {
 
       expect(status).toBe(429);
       expect(headers['retry-after']).toBe('120');
-      expect(body).toEqual(
-        expect.objectContaining({ message: 'Too many failed login attempts, try again later' }),
-      );
+      expect(body).toEqual(expect.objectContaining({ message: 'Too many failed login attempts, try again later' }));
     });
 
     it(`should require an email and password`, async () => {
