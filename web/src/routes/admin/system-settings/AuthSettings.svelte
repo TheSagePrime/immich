@@ -316,6 +316,81 @@
                 {disabled}
                 bind:checked={configToEdit.passwordLogin.enabled}
               />
+
+              <SettingSwitch
+                title={$t('admin.password_rate_limit_enable')}
+                subtitle={$t('admin.password_rate_limit_description')}
+                disabled={disabled || !configToEdit.passwordLogin.enabled}
+                bind:checked={configToEdit.passwordLogin.rateLimit.enabled}
+                isEdited={configToEdit.passwordLogin.rateLimit.enabled !== config.passwordLogin.rateLimit.enabled}
+              />
+
+              {#if configToEdit.passwordLogin.rateLimit.enabled}
+                <div class="mt-4 flex flex-col gap-4">
+                  <SettingInputField
+                    inputType={SettingInputFieldType.NUMBER}
+                    label={$t('admin.password_rate_limit_account_max_failures')}
+                    description={$t('admin.password_rate_limit_account_max_failures_description')}
+                    min={1}
+                    max={1000}
+                    required={true}
+                    disabled={disabled || !configToEdit.passwordLogin.enabled}
+                    bind:value={configToEdit.passwordLogin.rateLimit.accountMaxFailures}
+                    isEdited={configToEdit.passwordLogin.rateLimit.accountMaxFailures !==
+                      config.passwordLogin.rateLimit.accountMaxFailures}
+                  />
+
+                  <SettingInputField
+                    inputType={SettingInputFieldType.NUMBER}
+                    label={$t('admin.password_rate_limit_ip_max_failures')}
+                    description={$t('admin.password_rate_limit_ip_max_failures_description')}
+                    min={0}
+                    max={100_000}
+                    required={true}
+                    disabled={disabled || !configToEdit.passwordLogin.enabled}
+                    bind:value={configToEdit.passwordLogin.rateLimit.ipMaxFailures}
+                    isEdited={configToEdit.passwordLogin.rateLimit.ipMaxFailures !==
+                      config.passwordLogin.rateLimit.ipMaxFailures}
+                  />
+
+                  <SettingInputField
+                    inputType={SettingInputFieldType.NUMBER}
+                    label={$t('admin.password_rate_limit_window')}
+                    description={$t('admin.password_rate_limit_window_description')}
+                    min={1}
+                    max={1440}
+                    required={true}
+                    disabled={disabled || !configToEdit.passwordLogin.enabled}
+                    bind:value={configToEdit.passwordLogin.rateLimit.windowMinutes}
+                    isEdited={configToEdit.passwordLogin.rateLimit.windowMinutes !==
+                      config.passwordLogin.rateLimit.windowMinutes}
+                  />
+
+                  <SettingInputField
+                    inputType={SettingInputFieldType.NUMBER}
+                    label={$t('admin.password_rate_limit_lockout')}
+                    min={1}
+                    max={1440}
+                    required={true}
+                    disabled={disabled || !configToEdit.passwordLogin.enabled}
+                    bind:value={configToEdit.passwordLogin.rateLimit.lockoutMinutes}
+                    isEdited={configToEdit.passwordLogin.rateLimit.lockoutMinutes !==
+                      config.passwordLogin.rateLimit.lockoutMinutes}
+                  />
+
+                  <SettingInputField
+                    inputType={SettingInputFieldType.NUMBER}
+                    label={$t('admin.password_rate_limit_max_lockout')}
+                    min={1}
+                    max={10_080}
+                    required={true}
+                    disabled={disabled || !configToEdit.passwordLogin.enabled}
+                    bind:value={configToEdit.passwordLogin.rateLimit.maxLockoutMinutes}
+                    isEdited={configToEdit.passwordLogin.rateLimit.maxLockoutMinutes !==
+                      config.passwordLogin.rateLimit.maxLockoutMinutes}
+                  />
+                </div>
+              {/if}
             </div>
           </div>
         </SettingAccordion>

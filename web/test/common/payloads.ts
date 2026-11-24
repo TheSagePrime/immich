@@ -242,7 +242,17 @@ const adminConfig = (overrides: Partial<ResponseOf<'getAdminConfig'>> = {}): Res
     allowInsecureRequests: false,
   },
   passkey: { enabled: true, domain: null, additionalDomains: [] },
-  passwordLogin: { enabled: true },
+  passwordLogin: {
+    enabled: true,
+    rateLimit: {
+      enabled: true,
+      accountMaxFailures: 5,
+      ipMaxFailures: 30,
+      windowMinutes: 15,
+      lockoutMinutes: 1,
+      maxLockoutMinutes: 60,
+    },
+  },
   storageTemplate: {
     enabled: false,
     hashVerificationEnabled: true,

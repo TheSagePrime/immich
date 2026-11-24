@@ -20795,10 +20795,61 @@
           "enabled": {
             "description": "Enabled",
             "type": "boolean"
+          },
+          "rateLimit": {
+            "$ref": "#/components/schemas/AdminConfigPasswordLoginRateLimitDto"
           }
         },
         "required": [
-          "enabled"
+          "enabled",
+          "rateLimit"
+        ],
+        "type": "object"
+      },
+      "AdminConfigPasswordLoginRateLimitDto": {
+        "properties": {
+          "accountMaxFailures": {
+            "description": "Failed logins for one email address before further attempts are locked",
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "enabled": {
+            "description": "Whether failed password logins are rate limited",
+            "type": "boolean"
+          },
+          "ipMaxFailures": {
+            "description": "Failed logins from one IP address before further attempts are locked (0 disables)",
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lockoutMinutes": {
+            "description": "Length of the first lockout in minutes",
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxLockoutMinutes": {
+            "description": "Upper limit in minutes for lockouts that double with every further failure",
+            "maximum": 10080,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "windowMinutes": {
+            "description": "Minutes after the last failed login after which the failure count resets",
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountMaxFailures",
+          "enabled",
+          "ipMaxFailures",
+          "lockoutMinutes",
+          "maxLockoutMinutes",
+          "windowMinutes"
         ],
         "type": "object"
       },
