@@ -2,12 +2,14 @@
   import { shouldIgnoreEvent } from '#lib/actions/shortcut.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import FolderUploadModal from '#lib/modals/FolderUploadModal.svelte';
+  import { getAlbumInfoQuery } from '#lib/queries/album.query.ts';
   import { queryClient } from '#lib/queries/client.ts';
   import { getUploadLibrariesQuery } from '#lib/queries/upload-session.query.ts';
   import { dragAndDropFilesStore } from '#lib/stores/drag-and-drop-files.store.ts';
   import { getEntryRelativePath, type FolderUploadEntry } from '#lib/utils/chunked-upload.ts';
   import { fileUploadHandler } from '#lib/utils/file-uploader.ts';
   import { isAlbumsRoute, isLockedFolderRoute } from '#lib/utils/navigation.ts';
+  import { getUploadAlbumId } from '#lib/utils/upload-album.ts';
   import { Icon, Logo, modalManager } from '@immich/ui';
   import { mdiFolderUploadOutline } from '@mdi/js';
   import { createQuery } from '@tanstack/svelte-query';
@@ -15,7 +17,13 @@
   import { fade } from 'svelte/transition';
   import { page } from '$app/state';
 
-  let albumId = $derived(isAlbumsRoute(page.route?.id) ? page.params.albumId : undefined);
+  const routeAlbumId = $derived(isAlbumsRoute(page.route?.id) ? page.params.albumId : undefined);
+  let albumId = $derived(
+    getUploadAlbumId(
+      routeAlbumId,
+      routeAlbumId ? queryClient.getQueryData(getAlbumInfoQuery(routeAlbumId).queryKey) : undefined,
+    ),
+  );
   let isInLockedFolder = $derived(isLockedFolderRoute(page.route.id));
 
   const uploadLibrariesQuery = createQuery(() => ({

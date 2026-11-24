@@ -13,11 +13,27 @@ const folderAlbumIds = (list: AlbumResponseDto[]) =>
     .map(({ id }) => id)
     .toSorted((a, b) => a.localeCompare(b));
 
+const findFolderAlbum = (list: AlbumResponseDto[], name: string) =>
+  list.find((album) => album.isFolderAlbum && album.albumName === name);
+
+const waitForAlbums = async (accessToken: string, validate: (albums: AlbumResponseDto[]) => boolean) => {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const { body } = await request(app).get('/albums').set(asBearerAuth(accessToken));
+    if (validate(body)) {
+      return body as AlbumResponseDto[];
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('Folder albums did not sync in time');
+};
+
 describe('folder albums', () => {
   let admin: LoginResponseDto;
   let user: LoginResponseDto;
   let manual: AlbumResponseDto;
   let albums: AlbumResponseDto[];
+  let libraryId: string;
 
   const byName = (name: string) => {
     const album = albums.find((album) => album.albumName === name && album.isFolderAlbum);
@@ -41,6 +57,7 @@ describe('folder albums', () => {
       ownerId: admin.userId,
       importPaths: [rootInternal],
     });
+    libraryId = library.id;
     await utils.scan(admin.accessToken, library.id);
     manual = await utils.createAlbum(admin.accessToken, { albumName: 'Hand made' });
 
@@ -221,6 +238,21 @@ describe('folder albums', () => {
   });
 
   describe('sync', () => {
+    it('should create and remove folder albums on library scans without a manual job', async () => {
+      utils.createImageFile(`${root}/2025/new.png`);
+      await utils.scan(admin.accessToken, libraryId);
+
+      const created = await waitForAlbums(admin.accessToken, (list) => findFolderAlbum(list, '2025')?.assetCount === 1);
+      const album2025 = findFolderAlbum(created, '2025')!;
+      expect(album2025.parentAlbumId).toBe(findFolderAlbum(created, 'folder-albums')!.id);
+
+      utils.removeImageFile(`${root}/2025/new.png`);
+      await utils.scan(admin.accessToken, libraryId);
+
+      const removed = await waitForAlbums(admin.accessToken, (list) => !findFolderAlbum(list, '2025'));
+      expect(folderAlbumIds(removed)).toEqual(folderAlbumIds(albums));
+    });
+
     it('should keep folder albums unchanged when synced again', async () => {
       await utils.createJob(admin.accessToken, { name: ManualJobName.FolderAlbumSync });
       await utils.waitForQueueFinish(admin.accessToken, 'backgroundTask');
