@@ -99,7 +99,7 @@ describe('/server', () => {
         duplicateDetection: false,
         facialRecognition: false,
         backups: false,
-        map: true,
+        map: false,
         reverseGeocoding: true,
         importFaces: false,
         oauth: false,
