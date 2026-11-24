@@ -128,11 +128,13 @@ describe(FolderService.name, () => {
       user.id,
       AssetOrder.Desc,
     );
-    const before = new Map((await folderAlbums.getFolderAlbums(user.id)).map((album) => [album.folderPath, album.id]));
+    const beforeAlbums = await folderAlbums.getFolderAlbums(user.id);
+    const before = new Map(beforeAlbums.map((album) => [album.folderPath, album.id]));
 
     await sut.rename(auth, { path: join(root, 'trip'), name: 'holiday' });
 
-    const after = new Map((await folderAlbums.getFolderAlbums(user.id)).map((album) => [album.folderPath, album.id]));
+    const afterAlbums = await folderAlbums.getFolderAlbums(user.id);
+    const after = new Map(afterAlbums.map((album) => [album.folderPath, album.id]));
     expect(after.get(join(root, 'holiday'))).toBe(before.get(join(root, 'trip')));
     expect(after.get(join(root, 'holiday', 'day'))).toBe(before.get(join(root, 'trip', 'day')));
     expect(after.get(join(root, 'trip2'))).toBe(before.get(join(root, 'trip2')));

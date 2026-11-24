@@ -98,7 +98,13 @@ export const buildFolderAlbumRoots = (
 
 export const getFolderAlbumRootsKey = (roots: FolderAlbumRoot[]) =>
   createHash('sha1')
-    .update(JSON.stringify(roots.map(({ path, name, libraryId }) => [path, name, libraryId]).toSorted()))
+    .update(
+      JSON.stringify(
+        roots
+          .map(({ path, name, libraryId }) => JSON.stringify([path, name, libraryId]))
+          .toSorted((a, b) => a.localeCompare(b)),
+      ),
+    )
     .digest('hex');
 
 const isInside = (root: string, path: string) => path === root || path.startsWith(`${root}/`);
@@ -128,7 +134,7 @@ export const expandFolderAlbumPaths = (directory: string, root: FolderAlbumRoot)
   const rest = directory.slice(root.path.length).split('/').filter(Boolean);
   let current = root.path;
   for (const segment of rest) {
-    current = `${current}/${segment}`;
+    current += `/${segment}`;
     paths.push(current);
   }
 
@@ -184,8 +190,10 @@ export const diffFolderAlbums = (
   }
 
   const create: FolderAlbumCreate[] = [];
-  const missing = [...desired.values()]
+  const missing = desired
+    .values()
     .filter(({ path }) => !idByPath.has(path))
+    .toArray()
     .toSorted((a, b) => a.path.split('/').length - b.path.split('/').length || a.path.localeCompare(b.path));
   for (const item of missing) {
     idByPath.set(item.path, newId());
@@ -262,7 +270,7 @@ export const queueFolderAlbumSync = async (
     }
 
     const last = recentlyQueued.get(userId);
-    if (last !== undefined && now - last >= 0 && now - last < window) {
+    if (last !== undefined && now >= last && now - last < window) {
       continue;
     }
 

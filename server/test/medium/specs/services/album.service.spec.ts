@@ -28,6 +28,28 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
+const createTree = async () => {
+  const { sut, ctx } = setup();
+  const { user } = await ctx.newUser();
+  const { user: friend } = await ctx.newUser();
+  const root = `/data/library/${user.id}`;
+  const ids = { root: newUuid(), year: newUuid(), trip: newUuid(), day: newUuid() };
+  await ctx.get(FolderAlbumRepository).createFolderAlbums(
+    [
+      { id: ids.root, folderPath: root, albumName: 'Library', parentAlbumId: null },
+      { id: ids.year, folderPath: `${root}/2024`, albumName: '2024', parentAlbumId: ids.root },
+      { id: ids.trip, folderPath: `${root}/2024/trip`, albumName: 'trip', parentAlbumId: ids.year },
+      { id: ids.day, folderPath: `${root}/2024/trip/day`, albumName: 'day', parentAlbumId: ids.trip },
+    ],
+    user.id,
+    AssetOrder.Desc,
+  );
+  const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath: `${root}/2024/trip/a.jpg` });
+  await ctx.get(FolderAlbumRepository).addMembers(user.id);
+  const { album: manual } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Hand made' });
+  return { sut, ctx, user, friend, ids, asset, manual };
+};
+
 describe(AlbumService.name, () => {
   describe('removeAssets', () => {
     it('should not remove assets from an album of another user', async () => {
@@ -45,28 +67,6 @@ describe(AlbumService.name, () => {
   });
 
   describe('folder albums', () => {
-    const createTree = async () => {
-      const { sut, ctx } = setup();
-      const { user } = await ctx.newUser();
-      const { user: friend } = await ctx.newUser();
-      const root = `/data/library/${user.id}`;
-      const ids = { root: newUuid(), year: newUuid(), trip: newUuid(), day: newUuid() };
-      await ctx.get(FolderAlbumRepository).createFolderAlbums(
-        [
-          { id: ids.root, folderPath: root, albumName: 'Library', parentAlbumId: null },
-          { id: ids.year, folderPath: `${root}/2024`, albumName: '2024', parentAlbumId: ids.root },
-          { id: ids.trip, folderPath: `${root}/2024/trip`, albumName: 'trip', parentAlbumId: ids.year },
-          { id: ids.day, folderPath: `${root}/2024/trip/day`, albumName: 'day', parentAlbumId: ids.trip },
-        ],
-        user.id,
-        AssetOrder.Desc,
-      );
-      const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath: `${root}/2024/trip/a.jpg` });
-      await ctx.get(FolderAlbumRepository).addMembers(user.id);
-      const { album: manual } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Hand made' });
-      return { sut, ctx, user, friend, ids, asset, manual };
-    };
-
     it('should list hand-made albums and top-level folder albums only when topLevel is set', async () => {
       const { sut, user, ids, manual } = await createTree();
       const auth = factory.auth({ user });

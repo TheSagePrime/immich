@@ -9,18 +9,18 @@ import { ServiceMocks, newTestService } from 'test/utils.js';
 const userId = 'user-1';
 const now = new Date('2026-01-01T12:00:00.000Z');
 
+const rootsKey = () =>
+  getFolderAlbumRootsKey(
+    buildFolderAlbumRoots([{ id: 'lib-1', importPaths: ['/mnt/photos'] }], {
+      path: '/data/library/admin',
+      name: 'admin',
+    }),
+  );
+
 describe(FolderAlbumService.name, () => {
   let sut: FolderAlbumService;
   let mocks: ServiceMocks;
   let ids: number;
-
-  const rootsKey = () =>
-    getFolderAlbumRootsKey(
-      buildFolderAlbumRoots([{ id: 'lib-1', importPaths: ['/mnt/photos'] }], {
-        path: '/data/library/admin',
-        name: 'admin',
-      }),
-    );
 
   beforeEach(() => {
     StorageCore.setMediaLocation('/data');

@@ -134,7 +134,7 @@ describe('folder album utils', () => {
         roots,
       );
 
-      expect([...desired.values()]).toEqual([
+      expect(desired.values().toArray()).toEqual([
         { path: '/mnt/photos', name: 'photos', parentPath: null },
         { path: '/mnt/photos/2024', name: '2024', parentPath: '/mnt/photos' },
         { path: '/mnt/photos/2024/trip', name: 'trip', parentPath: '/mnt/photos/2024' },

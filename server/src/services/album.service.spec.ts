@@ -12,6 +12,17 @@ import { getForAlbum } from 'test/mappers.js';
 import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
+const setupFolderAlbum = (mocks: ServiceMocks) => {
+  const owner = UserFactory.create();
+  const album = AlbumFactory.from({ folderPath: '/mnt/photos/trip', folderOwnerId: owner.id, albumName: 'trip' })
+    .owner(owner)
+    .build();
+  mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+  mocks.album.getById.mockResolvedValue(getForAlbum(album));
+  mocks.album.update.mockResolvedValue(getForAlbum(album));
+  return { owner, album, auth: AuthFactory.create(owner) };
+};
+
 describe(AlbumService.name, () => {
   let sut: AlbumService;
   let mocks: ServiceMocks;
@@ -1500,19 +1511,8 @@ describe(AlbumService.name, () => {
   // });
 
   describe('folder albums', () => {
-    const setup = () => {
-      const owner = UserFactory.create();
-      const album = AlbumFactory.from({ folderPath: '/mnt/photos/trip', folderOwnerId: owner.id, albumName: 'trip' })
-        .owner(owner)
-        .build();
-      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
-      mocks.album.getById.mockResolvedValue(getForAlbum(album));
-      mocks.album.update.mockResolvedValue(getForAlbum(album));
-      return { owner, album, auth: AuthFactory.create(owner) };
-    };
-
     it('should mark folder albums in responses', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       mocks.album.getChildAlbumCounts.mockResolvedValue([{ albumId: album.id, childAlbumCount: 2 }]);
       await expect(sut.get(auth, album.id)).resolves.toMatchObject({
         id: album.id,
@@ -1538,7 +1538,7 @@ describe(AlbumService.name, () => {
     });
 
     it('should not allow renaming a folder album', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       await expect(sut.update(auth, album.id, { albumName: 'other' })).rejects.toThrow(
         'Folder albums are named after their folder',
       );
@@ -1546,7 +1546,7 @@ describe(AlbumService.name, () => {
     });
 
     it('should allow editing the description of a folder album', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       await sut.update(auth, album.id, { albumName: 'trip', description: 'Summer' });
       expect(mocks.album.update).toHaveBeenCalledWith(
         album.id,
@@ -1556,13 +1556,13 @@ describe(AlbumService.name, () => {
     });
 
     it('should not allow deleting a folder album', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       await expect(sut.delete(auth, album.id)).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.album.delete).not.toHaveBeenCalled();
     });
 
     it('should not allow adding assets to a folder album', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       const asset = AssetFactory.create();
       await expect(sut.addAssets(auth, album.id, { ids: [asset.id] })).resolves.toEqual([
         { id: asset.id, success: false, error: BulkIdErrorReason.NO_PERMISSION },
@@ -1571,7 +1571,7 @@ describe(AlbumService.name, () => {
     });
 
     it('should not allow removing assets from a folder album', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       const asset = AssetFactory.create();
       await expect(sut.removeAssets(auth, album.id, { ids: [asset.id] })).resolves.toEqual([
         { id: asset.id, success: false, error: BulkIdErrorReason.NO_PERMISSION },
@@ -1580,7 +1580,7 @@ describe(AlbumService.name, () => {
     });
 
     it('should skip folder albums when adding assets to several albums', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.album.getFolderAlbumIds.mockResolvedValue([album.id]);
@@ -1592,7 +1592,7 @@ describe(AlbumService.name, () => {
     });
 
     it('should allow sharing a folder album', async () => {
-      const { auth, album } = setup();
+      const { auth, album } = setupFolderAlbum(mocks);
       const user = UserFactory.create();
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
       mocks.user.get.mockResolvedValue(user);
@@ -1620,13 +1620,13 @@ describe(AlbumService.name, () => {
       });
 
       it('should require access', async () => {
-        const { album } = setup();
+        const { album } = setupFolderAlbum(mocks);
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
         await expect(sut.getFolder(AuthFactory.create(), album.id)).rejects.toBeInstanceOf(BadRequestException);
       });
 
       it('should return ancestors, path and sorted children', async () => {
-        const { auth, album, owner } = setup();
+        const { auth, album, owner } = setupFolderAlbum(mocks);
         const child10 = AlbumFactory.from({
           albumName: '10',
           folderPath: '/mnt/photos/trip/10',
@@ -1652,7 +1652,7 @@ describe(AlbumService.name, () => {
       });
 
       it('should cut ancestors at the first one the user cannot access and hide the path', async () => {
-        const { album } = setup();
+        const { album } = setupFolderAlbum(mocks);
         const viewer = UserFactory.create();
         mocks.folderAlbum.getAncestors.mockResolvedValue([
           { id: 'parent', albumName: 'b', depth: 1, accessible: true },

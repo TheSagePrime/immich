@@ -1,7 +1,7 @@
+import { describe, expect, it, vi } from 'vitest';
 import { FOLDER_ALBUM_SYNC_DELAY_MS } from 'src/constants.js';
 import { JobName, QueueName } from 'src/enum.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
-import { describe, expect, it, vi } from 'vitest';
 
 const setup = () => {
   const queue = { add: vi.fn().mockResolvedValue(void 0), addBulk: vi.fn().mockResolvedValue(void 0) };

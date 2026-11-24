@@ -119,11 +119,10 @@ describe('folder albums in the mobile sync stream', () => {
     const { ctx, auth, user, libraryFolder, sync, getFolderAlbum } = await setup();
     const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath: `${libraryFolder}/a/b/photo.jpg` });
     await sync();
-    const ids = [
-      (await getFolderAlbum(libraryFolder)).id,
-      (await getFolderAlbum(`${libraryFolder}/a`)).id,
-      (await getFolderAlbum(`${libraryFolder}/a/b`)).id,
-    ];
+    const albums = await Promise.all(
+      [libraryFolder, `${libraryFolder}/a`, `${libraryFolder}/a/b`].map((path) => getFolderAlbum(path)),
+    );
+    const ids = albums.map(({ id }) => id);
 
     const response = await ctx.syncStream(auth, [SyncRequestType.AlbumsV1]);
     await ctx.syncAckAll(auth, response);

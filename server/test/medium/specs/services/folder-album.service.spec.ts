@@ -40,44 +40,44 @@ beforeAll(async () => {
   StorageCore.setMediaLocation('/data');
 });
 
-describe(FolderAlbumService.name, () => {
-  const createContext = async () => {
-    const { sut, ctx } = setup();
-    const { user } = await ctx.newUser();
-    const libraryFolder = `/data/library/${user.id}`;
+const createContext = async () => {
+  const { sut, ctx } = setup();
+  const { user } = await ctx.newUser();
+  const libraryFolder = `/data/library/${user.id}`;
 
-    const newAsset = async (originalPath: string, dto: Parameters<typeof ctx.newAsset>[0] = {}) => {
-      const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath, ...dto });
-      return asset;
-    };
-
-    const getAlbums = (userId = user.id) =>
-      ctx.database
-        .selectFrom('album')
-        .select(['id', 'albumName', 'folderPath', 'parentAlbumId', 'updateId', 'deletedAt'])
-        .where('folderOwnerId', '=', userId)
-        .orderBy('folderPath')
-        .execute();
-
-    const getAlbumByPath = async (path: string, userId = user.id) => {
-      const albums = await getAlbums(userId);
-      return albums.find((album) => album.folderPath === path);
-    };
-
-    const getMembers = async (albumId: string) => {
-      const rows = await ctx.database
-        .selectFrom('album_asset')
-        .select('assetId')
-        .where('albumId', '=', albumId)
-        .execute();
-      return rows.map(({ assetId }) => assetId).toSorted();
-    };
-
-    const sync = (full?: boolean) => sut.handleSync({ userId: user.id, full });
-
-    return { sut, ctx, user, libraryFolder, newAsset, getAlbums, getAlbumByPath, getMembers, sync };
+  const newAsset = async (originalPath: string, dto: Parameters<typeof ctx.newAsset>[0] = {}) => {
+    const { asset } = await ctx.newAsset({ ownerId: user.id, originalPath, ...dto });
+    return asset;
   };
 
+  const getAlbums = (userId = user.id) =>
+    ctx.database
+      .selectFrom('album')
+      .select(['id', 'albumName', 'folderPath', 'parentAlbumId', 'updateId', 'deletedAt'])
+      .where('folderOwnerId', '=', userId)
+      .orderBy('folderPath')
+      .execute();
+
+  const getAlbumByPath = async (path: string, userId = user.id) => {
+    const albums = await getAlbums(userId);
+    return albums.find((album) => album.folderPath === path);
+  };
+
+  const getMembers = async (albumId: string) => {
+    const rows = await ctx.database
+      .selectFrom('album_asset')
+      .select('assetId')
+      .where('albumId', '=', albumId)
+      .execute();
+    return rows.map(({ assetId }) => assetId).toSorted();
+  };
+
+  const sync = (full?: boolean) => sut.handleSync({ userId: user.id, full });
+
+  return { sut, ctx, user, libraryFolder, newAsset, getAlbums, getAlbumByPath, getMembers, sync };
+};
+
+describe(FolderAlbumService.name, () => {
   it('should mirror a nested folder tree with continuous intermediate albums', async () => {
     const { libraryFolder, newAsset, getAlbums, getMembers, sync, user } = await createContext();
     const deep = `${libraryFolder}/a/b/c/d/e/f`;
@@ -206,8 +206,10 @@ describe(FolderAlbumService.name, () => {
 
     await sync();
 
-    expect((await getAlbums()).map(({ folderPath }) => folderPath)).toEqual([libraryFolder, `${libraryFolder}/v`]);
-    expect(await getMembers((await getAlbumByPath(`${libraryFolder}/v`))!.id)).toEqual([archived.id]);
+    const albums = await getAlbums();
+    expect(albums.map(({ folderPath }) => folderPath)).toEqual([libraryFolder, `${libraryFolder}/v`]);
+    const album = await getAlbumByPath(`${libraryFolder}/v`);
+    expect(await getMembers(album!.id)).toEqual([archived.id]);
   });
 
   it('should use external library import paths as roots and remove albums of a deleted library', async () => {
@@ -223,18 +225,20 @@ describe(FolderAlbumService.name, () => {
 
     await sync();
 
-    expect((await getAlbums()).map(({ folderPath, albumName }) => [folderPath, albumName])).toEqual([
+    const initial = await getAlbums();
+    expect(initial.map(({ folderPath, albumName }) => [folderPath, albumName])).toEqual([
       ['/mnt/photos', 'photos'],
       ['/mnt/photos/2024', '2024'],
     ]);
-    expect(await getMembers((await getAlbumByPath('/mnt/photos/2024'))!.id)).toEqual([asset.id]);
+    const year = await getAlbumByPath('/mnt/photos/2024');
+    expect(await getMembers(year!.id)).toEqual([asset.id]);
 
     await ctx.get(LibraryRepository).update(library.id, { importPaths: ['/mnt/photos/2024'] });
     await sync();
-    expect((await getAlbums()).map(({ folderPath, albumName }) => [folderPath, albumName])).toEqual([
-      ['/mnt/photos/2024', '2024'],
-    ]);
-    expect((await getAlbumByPath('/mnt/photos/2024'))!.parentAlbumId).toBeNull();
+    const changed = await getAlbums();
+    expect(changed.map(({ folderPath, albumName }) => [folderPath, albumName])).toEqual([['/mnt/photos/2024', '2024']]);
+    const newRoot = await getAlbumByPath('/mnt/photos/2024');
+    expect(newRoot!.parentAlbumId).toBeNull();
 
     await ctx.get(LibraryRepository).softDelete(library.id);
     await sync();

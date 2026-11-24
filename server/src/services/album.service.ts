@@ -68,7 +68,8 @@ export class AlbumService extends BaseService {
     await this.albumRepository.updateThumbnails();
 
     const ancestors: AlbumFolderResponseDto['ancestors'] = [];
-    for (const ancestor of await this.folderAlbumRepository.getAncestors(id, auth.user.id)) {
+    const chain = await this.folderAlbumRepository.getAncestors(id, auth.user.id);
+    for (const ancestor of chain) {
       if (!ancestor.accessible) {
         break;
       }
@@ -76,7 +77,8 @@ export class AlbumService extends BaseService {
     }
 
     const childAlbums = await this.albumRepository.getAll(auth.user.id, { parentAlbumId: id });
-    const children = (await this.mapAlbumList(childAlbums, auth.user.id)).toSorted((a, b) =>
+    const mappedChildren = await this.mapAlbumList(childAlbums, auth.user.id);
+    const children = mappedChildren.toSorted((a, b) =>
       a.albumName.localeCompare(b.albumName, undefined, { numeric: true, sensitivity: 'base' }),
     );
 
