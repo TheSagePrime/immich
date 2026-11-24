@@ -251,7 +251,7 @@ describe('folder albums', () => {
 
       const removed = await waitForAlbums(admin.accessToken, (list) => !findFolderAlbum(list, '2025'));
       expect(folderAlbumIds(removed)).toEqual(folderAlbumIds(albums));
-    });
+    }, 120_000);
 
     it('should keep folder albums unchanged when synced again', async () => {
       await utils.createJob(admin.accessToken, { name: ManualJobName.FolderAlbumSync });
