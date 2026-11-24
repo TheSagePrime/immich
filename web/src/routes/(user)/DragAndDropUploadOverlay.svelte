@@ -22,7 +22,9 @@
     ...getUploadLibrariesQuery(),
     enabled: authManager.authenticated && !authManager.isSharedLink,
   }));
-  const canUploadFolders = $derived((uploadLibrariesQuery.data?.length ?? 0) > 0);
+  const canUploadFolders = $derived(
+    !albumId && !isInLockedFolder && !authManager.isSharedLink && (uploadLibrariesQuery.data?.length ?? 0) > 0,
+  );
 
   let dragStartTarget: EventTarget | null = $state(null);
   let isInternalDrag = false;
@@ -88,7 +90,7 @@
   };
 
   const hasWritableLibrary = async () => {
-    if (authManager.isSharedLink) {
+    if (authManager.isSharedLink || albumId || isInLockedFolder) {
       return false;
     }
 

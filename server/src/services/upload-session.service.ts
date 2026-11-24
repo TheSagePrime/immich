@@ -14,6 +14,7 @@ import { pipeline } from 'node:stream/promises';
 import picomatch from 'picomatch';
 import {
   UPLOAD_CHUNK_SIZE,
+  UPLOAD_COMPLETING_STALE_MS,
   UPLOAD_FREE_SPACE_MARGIN,
   UPLOAD_MAX_ACTIVE_SESSIONS_PER_USER,
   UPLOAD_MAX_CHUNK_SIZE,
@@ -43,6 +44,7 @@ import {
   mapUploadSession,
 } from 'src/dtos/upload-session.dto.js';
 import {
+  AssetStatus,
   DatabaseLock,
   ImmichWorker,
   JobName,
@@ -96,6 +98,7 @@ const UPLOAD_CHECK_CONCURRENCY = 16;
 const NO_HARD_LINK_ERRORS = ['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EMLINK'];
 const MESSAGE_EXISTS = 'exists';
 const MESSAGE_CHECKSUM_MISMATCH = 'checksum_mismatch';
+const MESSAGE_PARTIAL_GONE = 'partial_gone';
 
 const terminalStatuses = new Set([
   UploadSessionStatus.Completed,
@@ -328,21 +331,52 @@ export class UploadSessionService extends BaseService {
       return this.map(session, await this.getOffset(session));
     }
 
-    this.assertActive(session);
+    const staleBefore = new Date(Date.now() - UPLOAD_COMPLETING_STALE_MS);
+    const isStale =
+      session.status === UploadSessionStatus.Completing &&
+      !!session.tempPath &&
+      new Date(session.updatedAt).getTime() < staleBefore.getTime();
+    if (!isStale) {
+      this.assertActive(session);
+    }
+
     if (this.activeWrites.has(session.id)) {
       throw new ConflictException('A chunk is still being written for this upload');
     }
 
-    const completing = await this.uploadSessionRepository.updateIfStatus(session.id, UploadSessionStatus.Active, {
-      status: UploadSessionStatus.Completing,
-    });
+    const completing = isStale
+      ? await this.uploadSessionRepository.updateIfStatus(
+          session.id,
+          UploadSessionStatus.Completing,
+          { status: UploadSessionStatus.Completing },
+          staleBefore,
+        )
+      : await this.uploadSessionRepository.updateIfStatus(session.id, UploadSessionStatus.Active, {
+          status: UploadSessionStatus.Completing,
+        });
     if (!completing) {
       throw new ConflictException('Upload is already being completed');
     }
 
     const tempPath = session.tempPath as string;
     const size = Number(session.size);
-    const storedSize = await this.getTempSize(session);
+    let storedSize: number;
+    try {
+      storedSize = await this.getTempSize(session);
+    } catch (error) {
+      if (error instanceof HttpException && error.getStatus() === HttpStatus.GONE) {
+        await this.uploadSessionRepository.update(session.id, {
+          status: UploadSessionStatus.Failed,
+          outcome: UploadOutcome.Failed,
+          message: MESSAGE_PARTIAL_GONE,
+        });
+        this.hashes.delete(session.id);
+      } else {
+        await this.uploadSessionRepository.update(session.id, { status: UploadSessionStatus.Active });
+      }
+      throw error;
+    }
+
     if (storedSize !== size) {
       await this.uploadSessionRepository.update(session.id, { status: UploadSessionStatus.Active });
       throw new ConflictException({ message: 'Upload is incomplete', offset: storedSize });
@@ -675,6 +709,10 @@ export class UploadSessionService extends BaseService {
       await this.storageRepository.link(tempPath, targetPath);
     } catch (error) {
       if (isErrorCode(error, 'EEXIST')) {
+        if (await this.isSameFile(tempPath, targetPath)) {
+          await this.storageRepository.unlink(tempPath);
+          return true;
+        }
         return false;
       }
 
@@ -695,18 +733,31 @@ export class UploadSessionService extends BaseService {
     return true;
   }
 
+  private async isSameFile(tempPath: string, targetPath: string) {
+    const [tempStats, targetStats] = await Promise.all([
+      this.storageRepository.lstat(tempPath),
+      this.storageRepository.lstat(targetPath).catch(() => null),
+    ]);
+    return (
+      !!targetStats &&
+      targetStats.isFile() &&
+      tempStats.nlink > 1 &&
+      tempStats.dev === targetStats.dev &&
+      tempStats.ino === targetStats.ino
+    );
+  }
+
   private async importAsset(library: WritableLibrary, target: UploadTarget) {
     const existing = await this.assetRepository.getByLibraryIdAndOriginalPath(library.id, target.assetPath);
     const stat = await this.storageRepository.stat(target.realPath);
 
     if (existing) {
-      if (existing.isOffline || existing.deletedAt) {
-        await this.assetRepository.updateAll([existing.id], {
-          isOffline: false,
-          deletedAt: null,
-          fileModifiedAt: stat.mtime,
-        });
-      }
+      const isTrashed = existing.status === AssetStatus.Trashed;
+      await this.assetRepository.updateAll([existing.id], {
+        fileModifiedAt: stat.mtime,
+        ...(existing.isOffline && { isOffline: false }),
+        ...(existing.isOffline && !isTrashed && { deletedAt: null }),
+      });
       await this.jobRepository.queue({ name: JobName.SidecarCheck, data: { id: existing.id, source: 'upload' } });
       return existing.id;
     }

@@ -169,6 +169,9 @@ existing upload (`POST /assets`, used by the mobile apps) is unchanged.
 - When all bytes are there, the server checks the size and the SHA-1 checksum the browser sent, then hard-links the file
   to its final name, which never overwrites an existing file (where hard links are not supported, it checks and
   renames). A checksum mismatch fails the file and deletes the partial data.
+- If the server stops while a file is being completed, the session stays "completing". After one hour the next
+  complete call (the web app sends one when it resumes the file) takes it over and finishes it; a hard link that was
+  already made is recognised, so no numbered copy is created.
 - Sessions expire 24 hours after the last received chunk. The `UploadSessionCleanup` job (nightly with the database
   cleanup tasks, and once when the microservices worker starts) deletes expired partial files, finished session rows
   older than 7 days, and `.part` files in `.immich-upload-tmp` of writable libraries that no session knows about.
