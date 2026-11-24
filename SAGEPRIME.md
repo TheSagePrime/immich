@@ -304,8 +304,9 @@ default. Turn it off in Administration > Settings > Server Settings > Simple mod
 Upload, search and the account menu in the top bar are not affected. Partners stay on the Sharing page.
 
 Hidden pages are only removed from the navigation: they still open by their address (for example `/explore`, `/map`,
-`/utilities`, `/locked`, `/tags`, `/memories`, `/buy`), and nothing is disabled on the server. The mobile apps are not
-affected.
+`/utilities`, `/locked`, `/tags`, `/memories`, `/buy`), they are still listed in the command palette (`Ctrl+K`), and
+nothing is disabled on the server. The memory lane at the top of the Photos page still follows the user's memories
+preference. The mobile apps are not affected.
 
 ### API (additive)
 
