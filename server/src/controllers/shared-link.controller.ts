@@ -68,7 +68,7 @@ export class SharedLinkController {
   }
 
   @Post('login')
-  @Authenticated({ sharedLink: true })
+  @Authenticated({ sharedLink: true, withoutSharedLinkPassword: true })
   @Endpoint({
     summary: 'Shared link login',
     description: 'Login to a password protected shared link',

@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { JWTVerifyGetKey, createRemoteJWKSet, jwtVerify } from 'jose';
+import { JWTVerifyGetKey, createRemoteJWKSet, customFetch as joseCustomFetch, jwtVerify } from 'jose';
 import {
   ClientSecretBasic,
   ClientSecretPost,
@@ -8,6 +8,7 @@ import {
   authorizationCodeGrant,
   buildAuthorizationUrl,
   calculatePKCECodeChallenge,
+  customFetch,
   discovery,
   fetchUserInfo,
   randomPKCECodeVerifier,
@@ -17,7 +18,9 @@ import {
 } from 'openid-client';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { OAuthTokenEndpointAuthMethod } from 'src/enum.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SafeFetch, createSafeFetch } from 'src/utils/safe-fetch.js';
 
 export type OAuthConfig = Pick<
   SystemConfig['oauth'],
@@ -44,8 +47,14 @@ export type OAuthRawProfile = UserInfoResponse;
 
 @Injectable()
 export class OAuthRepository {
-  constructor(private logger: LoggingRepository) {
+  private safeFetch: SafeFetch;
+
+  constructor(
+    private logger: LoggingRepository,
+    configRepository: ConfigRepository,
+  ) {
     this.logger.setContext(OAuthRepository.name);
+    this.safeFetch = createSafeFetch({ allowedHosts: configRepository.getEnv().network.outboundAllowedHosts });
   }
 
   async authorize(config: OAuthConfig, redirectUrl: string, state?: string, codeChallenge?: string) {
@@ -136,7 +145,7 @@ export class OAuthRepository {
   }
 
   async getProfilePicture(url: string) {
-    const response = await fetch(url);
+    const response = new URL(url).protocol === 'data:' ? await fetch(url) : await this.safeFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch picture: ${response.statusText}`);
     }
@@ -160,7 +169,10 @@ export class OAuthRepository {
         }
 
         if (!this.jwksClients.has(jwksUri)) {
-          this.jwksClients.set(jwksUri, createRemoteJWKSet(new URL(jwksUri)));
+          this.jwksClients.set(
+            jwksUri,
+            createRemoteJWKSet(new URL(jwksUri), { [joseCustomFetch]: (url, init) => this.safeFetch(url, init) }),
+          );
         }
         keyOrGetter = this.jwksClients.get(jwksUri) as JWTVerifyGetKey;
       }
@@ -222,6 +234,7 @@ export class OAuthRepository {
         {
           execute: allowInsecureRequests ? [allowInsecureRequestsExecute] : [],
           timeout,
+          [customFetch]: (url, init) => this.safeFetch(url, init as RequestInit),
         },
       );
     } catch (error: any | AggregateError) {

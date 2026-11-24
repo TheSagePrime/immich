@@ -197,6 +197,7 @@ export const utils = {
       'system_metadata',
       'tag',
       'integrity_report',
+      'login_attempt',
     ];
 
     const truncateTables = tables.filter((table) => table !== 'system_metadata');

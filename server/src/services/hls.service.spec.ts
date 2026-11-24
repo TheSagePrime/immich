@@ -319,6 +319,16 @@ describe(HlsService.name, () => {
       mocks.storage.checkFileExists.mockResolvedValue(true);
     });
 
+    it('rejects a session that belongs to another asset', async () => {
+      mocks.videoStream.getSession.mockResolvedValue({ id: sessionId, assetId: 'asset-2' } as never);
+
+      await expect(sut.getSegment(auth, assetId, sessionId, variantIndex, 'init.mp4')).rejects.toThrow(
+        'Session not found',
+      );
+      expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
+      expect(mocks.websocket.serverSend).not.toHaveBeenCalled();
+    });
+
     it('emits HlsHeartbeat with segmentIndex 0 for the first init.mp4 request', async () => {
       await sut.getSegment(auth, assetId, sessionId, variantIndex, 'init.mp4');
       expect(mocks.websocket.serverSend).toHaveBeenCalledWith('HlsHeartbeat', {
@@ -430,8 +440,18 @@ describe(HlsService.name, () => {
       const auth = factory.auth();
       const assetId = 'asset-1';
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.videoStream.getSession.mockResolvedValue({ id: sessionId, assetId } as never);
       await sut.endSession(auth, assetId, sessionId);
       expect(mocks.websocket.serverSend).toHaveBeenCalledWith('HlsSessionEnd', { sessionId });
+    });
+
+    it('ignores a session that belongs to another asset', async () => {
+      const auth = factory.auth();
+      const assetId = 'asset-1';
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.videoStream.getSession.mockResolvedValue({ id: sessionId, assetId: 'asset-2' } as never);
+      await sut.endSession(auth, assetId, sessionId);
+      expect(mocks.websocket.serverSend).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { ReleaseChannel } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { createSafeFetch } from 'src/utils/safe-fetch.js';
 
 export interface VersionResponse {
   version: string;
@@ -57,7 +58,7 @@ export class ServerInfoRepository {
 
   async getLatestRelease(channel: ReleaseChannel): Promise<VersionResponse> {
     try {
-      const { versionCheck } = this.configRepository.getEnv();
+      const { versionCheck, network } = this.configRepository.getEnv();
       const url = new URL(versionCheck.url);
       switch (channel) {
         case ReleaseChannel.Stable: {
@@ -69,7 +70,7 @@ export class ServerInfoRepository {
           break;
         }
       }
-      const response = await fetch(url);
+      const response = await createSafeFetch({ allowedHosts: network.outboundAllowedHosts })(url);
 
       if (!response.ok) {
         throw new Error(`Version check request failed with status ${response.status}: ${await response.text()}`);

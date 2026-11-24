@@ -3,6 +3,7 @@ import request from 'supertest';
 import { AuthController } from 'src/controllers/auth.controller.js';
 import { LoginResponseDto } from 'src/dtos/auth.dto.js';
 import { AuthService } from 'src/services/auth.service.js';
+import { TooManyRequestsException } from 'src/utils/rate-limit.js';
 import { mediumFactory } from 'test/medium.factory.js';
 import { errorDto } from 'test/medium/responses.js';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.js';
@@ -92,6 +93,20 @@ describe(AuthController.name, () => {
   });
 
   describe('POST /auth/login', () => {
+    it('should answer 429 with Retry-After when the login is rate limited', async () => {
+      service.login.mockRejectedValue(
+        new TooManyRequestsException('Too many failed login attempts, try again later', 120),
+      );
+
+      const { status, body, headers } = await request(ctx.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'admin@immich.cloud', password: 'password' });
+
+      expect(status).toBe(429);
+      expect(headers['retry-after']).toBe('120');
+      expect(body).toEqual(expect.objectContaining({ message: 'Too many failed login attempts, try again later' }));
+    });
+
     it(`should require an email and password`, async () => {
       const { status, body } = await request(ctx.getHttpServer()).post('/auth/login').send({ name: 'admin' });
       expect(status).toBe(400);

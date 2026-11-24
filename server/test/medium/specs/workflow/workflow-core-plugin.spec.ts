@@ -1,6 +1,8 @@
 import { WorkflowStepConfig, WorkflowTrigger } from '@immich/plugin-sdk';
 import { Kysely } from 'kysely';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { AddressInfo } from 'node:net';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto.js';
 import { AssetType, AssetVisibility, LogLevel } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
@@ -54,6 +56,7 @@ class WorkflowTestContext extends MediumTestContext<typeof WorkflowExecutionServ
     const mockData = mockEnvData({});
     mockData.resourcePaths.corePlugin = '../packages/plugin-core';
     mockData.plugins.external.allow = false;
+    mockData.network.outboundAllowedHosts = ['127.0.0.1'];
     this.getMock(ConfigRepository).getEnv.mockReturnValue(mockData);
     this.getMock(EventRepository).emit.mockResolvedValue();
     this.getMock(WebsocketRepository).clientSend.mockReturnValue();
@@ -1148,32 +1151,72 @@ describe('core plugin', () => {
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 
-      const fetchMock = vi.fn(() => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('') }));
-      vi.stubGlobal('fetch', fetchMock);
-
-      const workflow = await createWorkflow({
-        ownerId: user.id,
-        trigger: WorkflowTrigger.AssetCreate,
-        steps: [
-          {
-            method: 'immich-plugin-core#webhook',
-            config: { url: 'http://localhost', method: 'POST' },
-          },
-        ],
+      const requests: string[] = [];
+      const server = createServer((request, response) => {
+        requests.push(`${request.method} ${request.url}`);
+        response.writeHead(200);
+        response.end();
       });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const { port } = server.address() as AddressInfo;
 
-      await expect(
-        ctx.sut.handleAssetTrigger({
-          workflowId: workflow.id,
-          assetId: asset.id,
+      try {
+        const workflow = await createWorkflow({
+          ownerId: user.id,
           trigger: WorkflowTrigger.AssetCreate,
-        }),
-      ).resolves.toBeUndefined();
-      expect(fetchMock).toHaveBeenCalled();
+          steps: [
+            {
+              method: 'immich-plugin-core#webhook',
+              config: { url: `http://127.0.0.1:${port}/hook`, method: 'POST' },
+            },
+          ],
+        });
+
+        await expect(
+          ctx.sut.handleAssetTrigger({
+            workflowId: workflow.id,
+            assetId: asset.id,
+            trigger: WorkflowTrigger.AssetCreate,
+          }),
+        ).resolves.toBeUndefined();
+        expect(requests).toEqual(['POST /hook']);
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
     });
 
-    afterEach(() => {
-      vi.unstubAllGlobals();
+    it('should not send a webhook to a private address that is not allowlisted', async () => {
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      const requests: string[] = [];
+      const server = createServer((request, response) => {
+        requests.push(`${request.method} ${request.url}`);
+        response.writeHead(200);
+        response.end();
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.2', resolve));
+      const { port } = server.address() as AddressInfo;
+
+      try {
+        const workflow = await createWorkflow({
+          ownerId: user.id,
+          trigger: WorkflowTrigger.AssetCreate,
+          steps: [
+            {
+              method: 'immich-plugin-core#webhook',
+              config: { url: `http://127.0.0.2:${port}/hook`, method: 'POST' },
+            },
+          ],
+        });
+
+        await ctx.sut
+          .handleAssetTrigger({ workflowId: workflow.id, assetId: asset.id, trigger: WorkflowTrigger.AssetCreate })
+          .catch(() => {});
+        expect(requests).toEqual([]);
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
     });
   });
 

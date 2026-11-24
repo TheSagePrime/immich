@@ -56,6 +56,16 @@ final Map<String, Map<String, Object?>> openApiPatches = {
   'ServerVersionResponseDto': {'featureLevel': 0},
   'WorkflowResponseDto': {'logging': false},
   'LibraryResponseDto': {'writable': false},
+  'AdminConfigPasswordLoginDto': {
+    'rateLimit': {
+      'enabled': true,
+      'accountMaxFailures': 5,
+      'ipMaxFailures': 30,
+      'windowMinutes': 15,
+      'lockoutMinutes': 1,
+      'maxLockoutMinutes': 60,
+    },
+  },
   'AdminConfigDto': {
     'passkey': {'enabled': false, 'domain': null, 'additionalDomains': const []},
     'sharedLink': {'defaultExpiryDays': 0},
