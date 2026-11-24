@@ -11,6 +11,7 @@ import {
   addUsersToAlbum,
   createAlbum,
   deleteAlbum,
+  getAlbumFolder,
   getAlbumInfo,
   getAlbumMapMarkers,
   getAlbumStatistics,
@@ -55,6 +56,13 @@ export const getAllAlbumsQuery = (filter: AlbumsFilter = {}) =>
     select: (albums) => albums.filter(matchesFilter(filter)),
   });
 
+export const getTopLevelAlbumsQuery = (filter: AlbumsFilter = {}) =>
+  queryOptions({
+    queryKey: [...albumsQueryKey, 'top-level'],
+    queryFn: ({ signal }) => getAllAlbums({ topLevel: true }, { signal }),
+    select: (albums) => albums.filter(matchesFilter(filter)),
+  });
+
 export const getRecentAlbumsQuery = () =>
   queryOptions({
     ...getAllAlbumsQuery(),
@@ -84,6 +92,12 @@ export const getAlbumInfoQuery = (id: string) =>
   queryOptions({
     queryKey: ['album', id],
     queryFn: ({ signal }) => getAlbumInfo({ ...authManager.params, id }, { signal }),
+  });
+
+export const getAlbumFolderQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['album', id, 'folder'],
+    queryFn: ({ signal }) => getAlbumFolder({ id }, { signal }),
   });
 
 export const getAlbumMapMarkersQuery = (id: string) =>

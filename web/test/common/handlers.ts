@@ -127,7 +127,11 @@ export const createHandlers = (data: MockData): Handlers => {
       return stack ? { json: stack } : notFound;
     },
 
-    getAllAlbums: ({ params = {} }) => ({ json: data.albumList(params.assetId) }),
+    getAllAlbums: ({ params = {} }) => ({ json: data.albumList(params.assetId, { topLevel: params.topLevel }) }),
+    getAlbumFolder: ({ params }) => {
+      const folder = data.albumFolder(params.id);
+      return folder ? { json: folder } : notFound;
+    },
     createAlbum: ({ body }) => ({ status: 201, json: data.createAlbum(body) }),
     deleteAlbum: ({ params }) => {
       data.deleteAlbum(params.id);

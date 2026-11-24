@@ -5,7 +5,7 @@
   import EmptyPlaceholder from '#lib/components/shared-components/EmptyPlaceholder.svelte';
   import GroupTab from '#lib/elements/GroupTab.svelte';
   import SearchBar from '#lib/elements/SearchBar.svelte';
-  import { getAllAlbumsQuery } from '#lib/queries/album.query.ts';
+  import { getTopLevelAlbumsQuery } from '#lib/queries/album.query.ts';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { Route } from '#lib/route.ts';
   import { AlbumFilter, albumViewSettings } from '#lib/stores/preferences.store.ts';
@@ -21,8 +21,8 @@
   let { data }: Props = $props();
 
   const queries = {
-    ownedAlbums: createPreloadedQuery(() => getAllAlbumsQuery({ isOwned: true })),
-    sharedAlbums: createPreloadedQuery(() => getAllAlbumsQuery({ isShared: true })),
+    ownedAlbums: createPreloadedQuery(() => getTopLevelAlbumsQuery({ isOwned: true })),
+    sharedAlbums: createPreloadedQuery(() => getTopLevelAlbumsQuery({ isShared: true })),
   };
 
   let searchQuery = $state('');

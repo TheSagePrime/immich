@@ -16,6 +16,7 @@
     { title: $t('admin.memory_cleanup_job'), value: ManualJobName.MemoryCleanup },
     { title: $t('admin.memory_generate_job'), value: ManualJobName.MemoryCreate },
     { title: $t('admin.backup_database'), value: ManualJobName.BackupDatabase },
+    { title: $t('admin.folder_album_sync_job'), value: ManualJobName.FolderAlbumSync },
     {
       title: $t('admin.maintenance_integrity_missing_file_job'),
       value: ManualJobName.IntegrityMissingFiles,

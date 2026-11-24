@@ -14,6 +14,7 @@
 
   // Albums
   let defaultAssetOrder = $state(authManager.preferences.albums?.defaultAssetOrder ?? AssetOrder.Desc);
+  let folderAlbumsEnabled = $state(authManager.preferences.folderAlbums?.enabled ?? true);
 
   // Folders
   let foldersEnabled = $state(authManager.preferences.folders?.enabled ?? false);
@@ -55,6 +56,7 @@
       const response = await updateMyPreferences({
         userPreferencesUpdateDto: {
           albums: { defaultAssetOrder },
+          folderAlbums: { enabled: folderAlbumsEnabled },
           folders: { enabled: foldersEnabled, sidebarWeb: foldersSidebar },
           navigation: { startPage: foldersEnabled ? startPage : StartPage.Timeline },
           memories: { enabled: memoriesEnabled, duration: memoriesDuration, sidebarWeb: memoriesSidebar },
@@ -98,6 +100,10 @@
                 ]}
                 bind:value={defaultAssetOrder}
               />
+            </Field>
+
+            <Field label={$t('folder_albums')} description={$t('folder_albums_feature_description')}>
+              <Switch bind:checked={folderAlbumsEnabled} />
             </Field>
           </div>
         </SettingAccordion>

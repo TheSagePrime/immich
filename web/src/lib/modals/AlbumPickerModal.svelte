@@ -21,8 +21,8 @@
     recentAlbums: createQuery(getRecentAlbumsQuery, () => queryClient),
   };
 
-  const albums = $derived(queries.albums.data ?? []);
-  const recentAlbums = $derived(queries.recentAlbums.data ?? []);
+  const albums = $derived((queries.albums.data ?? []).filter(({ isFolderAlbum }) => !isFolderAlbum));
+  const recentAlbums = $derived((queries.recentAlbums.data ?? []).filter(({ isFolderAlbum }) => !isFolderAlbum));
   const loading = $derived(queries.albums.isPending);
   let search = $state('');
   let selectedRowIndex: number = $state(-1);

@@ -3,7 +3,8 @@
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { getShortDateRange } from '#lib/utils/date-time.ts';
   import { type AlbumResponseDto } from '@immich/sdk';
-  import { ContextMenuButton, type MenuItems } from '@immich/ui';
+  import { ContextMenuButton, Icon, type MenuItems } from '@immich/ui';
+  import { mdiFolderOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   type Props = {
@@ -57,6 +58,19 @@
     >
       {album.albumName}
     </p>
+
+    {#if album.isFolderAlbum}
+      <p class="flex items-center gap-1 text-sm text-primary" data-testid="folder-album-badge">
+        <Icon icon={mdiFolderOutline} size="16" aria-hidden />
+        <span>{$t('folder_album')}</span>
+        {#if album.childAlbumCount}
+          <span class="text-gray-500 dark:text-gray-400">•</span>
+          <span class="text-gray-500 dark:text-gray-400">
+            {$t('albums_count', { values: { count: album.childAlbumCount } })}
+          </span>
+        {/if}
+      </p>
+    {/if}
 
     {#if showDateRange && album.startDate && album.endDate}
       <p class="flex text-sm capitalize dark:text-immich-dark-fg">

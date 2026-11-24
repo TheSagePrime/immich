@@ -1,4 +1,4 @@
-import { getAllAlbumsQuery } from '#lib/queries/album.query.ts';
+import { getTopLevelAlbumsQuery } from '#lib/queries/album.query.ts';
 import { queryClient } from '#lib/queries/client.ts';
 import { authenticate } from '#lib/utils/auth.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
@@ -6,7 +6,7 @@ import type { PageLoad } from './$types';
 
 export const load = (async ({ url }) => {
   await authenticate(url);
-  await queryClient.query({ ...getAllAlbumsQuery(), staleTime: 0 });
+  await queryClient.query({ ...getTopLevelAlbumsQuery(), staleTime: 0 });
   const $t = await getFormatter();
 
   return {

@@ -3,8 +3,10 @@
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
   import HeaderActionButton from '#lib/components/HeaderActionButton.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import AlbumFolderBreadcrumbs from '#lib/components/album-page/AlbumFolderBreadcrumbs.svelte';
   import AlbumMap from '#lib/components/album-page/AlbumMap.svelte';
   import AlbumSummary from '#lib/components/album-page/AlbumSummary.svelte';
+  import FolderAlbumChildren from '#lib/components/album-page/FolderAlbumChildren.svelte';
   import ActivityStatus from '#lib/components/asset-viewer/ActivityStatus.svelte';
   import ActivityViewer from '#lib/components/asset-viewer/ActivityViewer.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
@@ -30,11 +32,12 @@
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
   import {
     deleteAlbumMutation,
+    getAlbumFolderQuery,
     getAlbumInfoQuery,
     invalidateAlbum,
     updateAlbumInfoMutation,
   } from '#lib/queries/album.query.ts';
-  import { createPreloadedQuery, executeMutation } from '#lib/queries/client.ts';
+  import { createPreloadedQuery, executeMutation, queryClient } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
   import { Route } from '#lib/route.ts';
   import { getAlbumActions, getAlbumAssetsActions, isAlbumEditor, isAlbumOwner } from '#lib/services/album.service.ts';
@@ -53,12 +56,14 @@
     mdiArrowLeft,
     mdiDotsHorizontal,
     mdiDotsVertical,
+    mdiFolderOutline,
     mdiImageOutline,
     mdiImagePlusOutline,
     mdiLink,
     mdiPlus,
     mdiPresentationPlay,
   } from '@mdi/js';
+  import { createQuery } from '@tanstack/svelte-query';
   import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
@@ -75,6 +80,13 @@
   };
   const config = $derived(queries.config.data);
   const album = $derived(queries.album.data);
+  const folderQuery = createQuery(
+    () => ({ ...getAlbumFolderQuery(params.albumId), enabled: !!queries.album.data.isFolderAlbum }),
+    () => queryClient,
+  );
+  const folder = $derived(album.isFolderAlbum ? folderQuery.data : undefined);
+  const parentAlbum = $derived(folder?.ancestors.at(-1));
+  const backRoute = $derived(parentAlbum ? Route.viewAlbum(parentAlbum) : Route.albums());
   let { slideshowState, slideshowNavigation } = slideshowStore;
   let oldAt: AssetGridRouteSearchParams | null | undefined = $state();
   let viewMode: AlbumPageViewMode = $state(AlbumPageViewMode.VIEW);
@@ -120,7 +132,7 @@
       assetMultiSelectManager.clear();
       return;
     }
-    await goto(Route.albums());
+    await goto(backRoute);
   };
 
   const refreshAlbum = () => invalidateAlbum(album.id);
@@ -244,6 +256,7 @@
       (album.isActivityEnabled || activityManager.commentCount > 0),
   );
   const isEditor = $derived(isAlbumEditor(album));
+  const canEditAssets = $derived(isEditor && !album.isFolderAlbum);
 
   const isSelectionMode = $derived(
     viewMode === AlbumPageViewMode.SELECT_ASSETS || viewMode === AlbumPageViewMode.SELECT_THUMBNAIL,
@@ -309,7 +322,28 @@
           {#if viewMode !== AlbumPageViewMode.SELECT_THUMBNAIL}
             <!-- ALBUM TITLE -->
             <section class="pt-8 md:pt-24">
-              <AlbumTitle id={album.id} albumName={album.albumName} {isEditor} />
+              {#if album.isFolderAlbum}
+                <AlbumFolderBreadcrumbs albumName={album.albumName} ancestors={folder?.ancestors ?? []} />
+              {/if}
+
+              <AlbumTitle id={album.id} albumName={album.albumName} isEditor={isEditor && !album.isFolderAlbum} />
+
+              {#if album.isFolderAlbum}
+                <p
+                  class="mt-2 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+                  data-testid="folder-album-info"
+                >
+                  <span class="flex items-center gap-1 font-medium text-primary" data-testid="folder-album-badge">
+                    <Icon icon={mdiFolderOutline} size="18" aria-hidden />
+                    {$t('folder_album')}
+                  </span>
+                  <span>
+                    {folder?.path
+                      ? $t('folder_album_info', { values: { path: folder.path } })
+                      : $t('folder_album_info_shared')}
+                  </span>
+                </p>
+              {/if}
 
               {#if album.assetCount > 0}
                 <AlbumSummary {album} />
@@ -355,10 +389,14 @@
               {/if}
 
               <AlbumDescription id={album.id} {isEditor} description={album.description} />
+
+              {#if folder}
+                <FolderAlbumChildren albums={folder.children} />
+              {/if}
             </section>
           {/if}
 
-          {#if album.assetCount === 0}
+          {#if album.assetCount === 0 && !album.isFolderAlbum}
             <section id="empty-album" class="mt-50 flex place-content-center place-items-center">
               <div class="w-75">
                 <p class="text-xs uppercase dark:text-immich-dark-fg">{$t('add_photos')}</p>
@@ -433,11 +471,11 @@
       </AssetSelectControlBar>
     {:else}
       {#if viewMode === AlbumPageViewMode.VIEW}
-        <ControlAppBar backIcon={mdiArrowLeft} onClose={() => goto(Route.albums())}>
+        <ControlAppBar backIcon={mdiArrowLeft} onClose={() => goto(backRoute)}>
           {#snippet trailing()}
             <ActionButton action={Cast} />
 
-            {#if isEditor}
+            {#if canEditAssets}
               <IconButton
                 variant="ghost"
                 shape="round"
