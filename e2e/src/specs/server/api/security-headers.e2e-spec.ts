@@ -12,9 +12,10 @@ const directive = (policy: string, name: string) =>
     ?.slice(1);
 
 const inlineHashes = (html: string, tag: 'script' | 'style') =>
-  [...html.matchAll(new RegExp(`<${tag}(?![^>]*\\ssrc=)[^>]*>([\\s\\S]*?)</${tag}>`, 'g'))].map(
-    ([, content]) => `'sha256-${createHash('sha256').update(content).digest('base64')}'`,
-  );
+  html
+    .matchAll(new RegExp(String.raw`<${tag}(?![^>]*\ssrc=)[^>]*>([\s\S]*?)</${tag}>`, 'g'))
+    .map(([, content]) => `'sha256-${createHash('sha256').update(content).digest('base64')}'`)
+    .toArray();
 
 describe('security headers', () => {
   let admin: LoginResponseDto;

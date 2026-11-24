@@ -454,9 +454,10 @@ describe('/shared-links', () => {
     });
 
     it('should revoke every shared link of the user and only of the user', async () => {
+      const adminAsset = await utils.createAsset(admin.accessToken);
       const otherLink = await utils.createSharedLink(admin.accessToken, {
         type: SharedLinkType.Individual,
-        assetIds: [(await utils.createAsset(admin.accessToken)).id],
+        assetIds: [adminAsset.id],
       });
 
       const before = await request(app).get('/shared-links').set('Authorization', `Bearer ${user1.accessToken}`);
