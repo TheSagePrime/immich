@@ -6,6 +6,11 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const login = (email: string, password: string) => request(app).post('/auth/login').send({ email, password });
 
+const loginStatus = async (email: string, password: string) => {
+  const { status } = await login(email, password);
+  return status;
+};
+
 describe('password login rate limiting', () => {
   let admin: LoginResponseDto;
 
@@ -74,11 +79,11 @@ describe('password login rate limiting', () => {
     for (let i = 0; i < 4; i++) {
       await login(user.userEmail, 'wrong-password');
     }
-    expect((await login(other.userEmail, createUserDto.create('rate-limit-3').password)).status).toBe(201);
-    expect((await login(user.userEmail, createUserDto.create('rate-limit-2').password)).status).toBe(201);
+    expect(await loginStatus(other.userEmail, createUserDto.create('rate-limit-3').password)).toBe(201);
+    expect(await loginStatus(user.userEmail, createUserDto.create('rate-limit-2').password)).toBe(201);
 
     for (let i = 0; i < 4; i++) {
-      expect((await login(user.userEmail, 'wrong-password')).status).toBe(401);
+      expect(await loginStatus(user.userEmail, 'wrong-password')).toBe(401);
     }
   });
 
@@ -86,10 +91,10 @@ describe('password login rate limiting', () => {
     await setRateLimit({ ipMaxFailures: 3 });
     const user = await utils.userSetup(admin.accessToken, createUserDto.create('rate-limit-4'));
 
-    expect((await login('spray-1@immich.cloud', 'wrong-password')).status).toBe(401);
-    expect((await login('spray-2@immich.cloud', 'wrong-password')).status).toBe(401);
-    expect((await login('spray-3@immich.cloud', 'wrong-password')).status).toBe(429);
-    expect((await login(user.userEmail, createUserDto.create('rate-limit-4').password)).status).toBe(429);
+    expect(await loginStatus('spray-1@immich.cloud', 'wrong-password')).toBe(401);
+    expect(await loginStatus('spray-2@immich.cloud', 'wrong-password')).toBe(401);
+    expect(await loginStatus('spray-3@immich.cloud', 'wrong-password')).toBe(429);
+    expect(await loginStatus(user.userEmail, createUserDto.create('rate-limit-4').password)).toBe(429);
   });
 
   it('should not limit logins when an admin turns it off', async () => {
@@ -98,13 +103,13 @@ describe('password login rate limiting', () => {
       await login(user.userEmail, 'wrong-password');
     }
     const password = createUserDto.create('rate-limit-5').password;
-    expect((await login(user.userEmail, password)).status).toBe(429);
+    expect(await loginStatus(user.userEmail, password)).toBe(429);
 
     await setRateLimit({ enabled: false });
 
     for (let i = 0; i < 8; i++) {
-      expect((await login(user.userEmail, 'wrong-password')).status).toBe(401);
+      expect(await loginStatus(user.userEmail, 'wrong-password')).toBe(401);
     }
-    expect((await login(user.userEmail, password)).status).toBe(201);
+    expect(await loginStatus(user.userEmail, password)).toBe(201);
   });
 });
