@@ -382,6 +382,8 @@ export type AdminConfigServerDto = {
     loginPageMessage: string;
     /** Public users */
     publicUsers: boolean;
+    /** Hide rarely used features from the web navigation for all users */
+    simpleMode: boolean;
 };
 export type AdminConfigStorageTemplateDto = {
     /** Enabled */
@@ -1660,6 +1662,8 @@ export type UserConfigServerDto = {
     loginPageMessage: string;
     /** Public users */
     publicUsers: boolean;
+    /** Hide rarely used features from the web navigation for all users */
+    simpleMode: boolean;
 };
 export type UserConfigTrashDto = {
     /** Days */

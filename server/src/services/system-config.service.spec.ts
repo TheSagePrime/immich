@@ -10,6 +10,7 @@ import {
   OAuthTokenEndpointAuthMethod,
   QueueName,
   ReleaseChannel,
+  SystemMetadataKey,
   ToneMapping,
   TranscodeHardwareAcceleration,
   TranscodePolicy,
@@ -190,6 +191,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     externalDomain: '',
     loginPageMessage: '',
     publicUsers: true,
+    simpleMode: true,
   },
   storageTemplate: {
     enabled: false,
@@ -516,6 +518,53 @@ describe(SystemConfigService.name, () => {
       mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({}));
       await expect(sut.updateAdminConfig(defaults)).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.systemMetadata.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('simple mode', () => {
+    it('should be enabled by default', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({ server: { simpleMode: true } });
+      await expect(sut.getUserConfig()).resolves.toMatchObject({ server: { simpleMode: true } });
+    });
+
+    it('should expose the stored value to users', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ server: { simpleMode: false } });
+
+      await expect(sut.getUserConfig()).resolves.toMatchObject({ server: { simpleMode: false } });
+    });
+
+    it('should not expose simple mode in the public config', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      const config = (await sut.getPublicConfig()) as Record<string, any>;
+      expect(config.server).toEqual({ loginPageMessage: '' });
+    });
+
+    it('should transform a string boolean from the config file', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ server: { simpleMode: 'false' } }));
+
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({ server: { simpleMode: false } });
+    });
+
+    it('should reject a value that is not a boolean', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ server: { simpleMode: 'yes' } }));
+
+      await expect(sut.getAdminConfig()).rejects.toBeInstanceOf(Error);
+    });
+
+    it('should turn simple mode off', async () => {
+      mocks.systemMetadata.get.mockResolvedValueOnce({}).mockResolvedValue({ server: { simpleMode: false } });
+      const config = { ...defaults, server: { ...defaults.server, simpleMode: false } };
+
+      await expect(sut.updateAdminConfig(config)).resolves.toMatchObject({ server: { simpleMode: false } });
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.SystemConfig,
+        expect.objectContaining({ server: { simpleMode: false } }),
+      );
     });
   });
 

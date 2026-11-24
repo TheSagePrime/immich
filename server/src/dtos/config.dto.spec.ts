@@ -69,6 +69,22 @@ describe('config visibility', () => {
     expect(config.notifications).toEqual({ smtp: { enabled: defaults.notifications.smtp.enabled } });
   });
 
+  it('should enable simple mode by default and expose it to users only', () => {
+    expect(defaults.server.simpleMode).toBe(true);
+    expect((mapUserConfig(defaults) as Record<string, any>).server.simpleMode).toBe(true);
+    expect((mapPublicConfig(defaults) as Record<string, any>).server.simpleMode).toBeUndefined();
+  });
+
+  it('should only accept a boolean for simple mode', () => {
+    const parse = (simpleMode: unknown) =>
+      AdminConfigDto.schema.safeParse({ ...defaults, server: { ...defaults.server, simpleMode } });
+
+    expect(parse(false).success).toBe(true);
+    expect(parse('yes').success).toBe(false);
+    expect(parse(1).success).toBe(false);
+    expect(parse(undefined).success).toBe(false);
+  });
+
   it('should keep the visibility metadata out of the schemas', () => {
     for (const schema of [AdminConfigDto.schema, UserConfigDto.schema, PublicConfigDto.schema]) {
       const json = JSON.stringify(z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }));

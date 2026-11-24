@@ -20827,12 +20827,17 @@
           "publicUsers": {
             "description": "Public users",
             "type": "boolean"
+          },
+          "simpleMode": {
+            "description": "Hide rarely used features from the web navigation for all users",
+            "type": "boolean"
           }
         },
         "required": [
           "externalDomain",
           "loginPageMessage",
-          "publicUsers"
+          "publicUsers",
+          "simpleMode"
         ],
         "type": "object"
       },
@@ -35619,12 +35624,17 @@
           "publicUsers": {
             "description": "Public users",
             "type": "boolean"
+          },
+          "simpleMode": {
+            "description": "Hide rarely used features from the web navigation for all users",
+            "type": "boolean"
           }
         },
         "required": [
           "externalDomain",
           "loginPageMessage",
-          "publicUsers"
+          "publicUsers",
+          "simpleMode"
         ],
         "type": "object"
       },

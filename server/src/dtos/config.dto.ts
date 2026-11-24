@@ -440,6 +440,9 @@ const AdminConfigSchemaWithVisibility = z
           .meta({ visibility: User }),
         loginPageMessage: z.string().describe('Login page message').meta({ visibility: Public }),
         publicUsers: configBool.describe('Public users').meta({ visibility: User }),
+        simpleMode: configBool
+          .describe('Hide rarely used features from the web navigation for all users')
+          .meta({ visibility: User }),
       })
       .meta({ id: 'AdminConfigServerDto' }),
     user: z
@@ -792,6 +795,7 @@ export const defaults = Object.freeze<SystemConfig>({
     externalDomain: '',
     loginPageMessage: '',
     publicUsers: true,
+    simpleMode: true,
   },
   notifications: {
     smtp: {

@@ -56,6 +56,8 @@ final Map<String, Map<String, Object?>> openApiPatches = {
   'ServerVersionResponseDto': {'featureLevel': 0},
   'WorkflowResponseDto': {'logging': false},
   'LibraryResponseDto': {'writable': false},
+  'AdminConfigServerDto': {'simpleMode': false},
+  'UserConfigServerDto': {'simpleMode': false},
   'AdminConfigDto': {
     'passkey': {'enabled': false, 'domain': null, 'additionalDomains': const []},
   },
