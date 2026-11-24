@@ -1,3 +1,6 @@
+import { folderUploadManager } from '#lib/managers/folder-upload-manager.svelte.ts';
+import type { UploadDropTarget } from '#lib/managers/upload-drop-target-manager.svelte.ts';
+import { uploadManager } from '#lib/managers/upload-manager.svelte.ts';
 import FolderDeleteConfirmModal from '#lib/modals/FolderDeleteConfirmModal.svelte';
 import FolderNameModal from '#lib/modals/FolderNameModal.svelte';
 import FolderPickerModal from '#lib/modals/FolderPickerModal.svelte';
@@ -13,11 +16,17 @@ import {
 import { getFolderSummaryQuery } from '#lib/queries/view.query.ts';
 import { handleDownloadAsset } from '#lib/services/asset.service.ts';
 import { downloadArchive } from '#lib/utils/asset-utils.ts';
-import { openFolderPicker, toFolderUploadEntries } from '#lib/utils/chunked-upload.ts';
+import {
+  filterUploadableEntries,
+  isHiddenPath,
+  openFolderPicker,
+  toFolderUploadEntries,
+  type FolderUploadEntry,
+} from '#lib/utils/chunked-upload.ts';
 import type { FolderCard } from '#lib/utils/folder-cards.ts';
 import { findLibraryRootPath, getFolderName, getRelativeFolderPath, splitFileName } from '#lib/utils/folder-utils.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
-import type { AssetResponseDto, FolderBulkFailureDto } from '@immich/sdk';
+import { UploadDuplicatePolicy, type AssetResponseDto, type FolderBulkFailureDto } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
   mdiDeleteOutline,
@@ -182,6 +191,48 @@ export const handleUploadIntoFolder = async (path: string, libraryId?: string) =
   const destination = root ? getRelativeFolderPath(root, path) : '';
 
   await modalManager.show(FolderUploadModal, { entries: toFolderUploadEntries(files), libraryId, destination });
+};
+
+const resolveUploadDropTarget = async ({ libraryId, folderPath, destination = '', writable }: UploadDropTarget) => {
+  if (!writable) {
+    return;
+  }
+
+  if (!folderPath) {
+    return libraryId ? { libraryId, destination } : undefined;
+  }
+
+  const getSummary = (path: string) => queryClient.fetchQuery(getFolderSummaryQuery(path));
+  const root = await findLibraryRootPath(folderPath, getSummary).catch(() => undefined);
+  if (!root) {
+    return;
+  }
+
+  const rootSummary = libraryId ? undefined : await getSummary(root).catch(() => undefined);
+  const rootLibraryId = libraryId ?? rootSummary?.libraryId;
+  return rootLibraryId ? { libraryId: rootLibraryId, destination: getRelativeFolderPath(root, folderPath) } : undefined;
+};
+
+export const handleUploadDrop = async (target: UploadDropTarget, entries: FolderUploadEntry[]) => {
+  const $t = await getFormatter();
+  const resolved = await resolveUploadDropTarget(target);
+  if (!resolved) {
+    toastManager.warning($t('upload_target_read_only', { values: { name: target.label } }));
+    return 0;
+  }
+
+  const { accepted, ignored } = filterUploadableEntries(entries, uploadManager.getExtensions());
+  const unsupported = ignored.filter((entry) => !isHiddenPath(entry.relativePath));
+  if (unsupported.length > 0) {
+    toastManager.warning($t('upload_folder_ignored', { values: { count: unsupported.length } }));
+  }
+
+  return folderUploadManager.start({
+    ...resolved,
+    duplicatePolicy: UploadDuplicatePolicy.Skip,
+    entries: accepted,
+    targetLabel: target.label,
+  });
 };
 
 export const getFolderActions = ($t: MessageFormatter, path: string, onChanged?: OnChanged, libraryId?: string) => {

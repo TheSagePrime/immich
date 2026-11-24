@@ -106,6 +106,15 @@
           <Icon icon={mdiFolderUploadOutline} size="20" />
           {$t('upload_folder_uploads')}
         </h2>
+        {#if manager.targetLabels.length > 0}
+          <p
+            class="truncate text-xs font-medium"
+            data-testid="folder-upload-target"
+            data-target={manager.targetLabels.join(', ')}
+          >
+            {$t('upload_target', { values: { name: manager.targetLabels.join(', ') } })}
+          </p>
+        {/if}
         {#if manager.totalFiles > 0}
           <p class="text-xs" data-testid="folder-upload-files">
             {$t('upload_files_progress', { values: { done: manager.finishedFiles, total: manager.totalFiles } })}

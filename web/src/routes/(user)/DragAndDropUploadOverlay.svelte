@@ -1,17 +1,23 @@
 <script lang="ts">
   import { shouldIgnoreEvent } from '#lib/actions/shortcut.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import FolderUploadModal from '#lib/modals/FolderUploadModal.svelte';
+  import {
+    uploadDropTargetManager,
+    type UploadDropTarget,
+    type UploadDropTargetMatch,
+  } from '#lib/managers/upload-drop-target-manager.svelte.ts';
   import { getAlbumInfoQuery } from '#lib/queries/album.query.ts';
   import { queryClient } from '#lib/queries/client.ts';
   import { getUploadLibrariesQuery } from '#lib/queries/upload-session.query.ts';
+  import { handleUploadDrop } from '#lib/services/folder.service.ts';
   import { dragAndDropFilesStore } from '#lib/stores/drag-and-drop-files.store.ts';
   import { getEntryRelativePath, type FolderUploadEntry } from '#lib/utils/chunked-upload.ts';
   import { fileUploadHandler } from '#lib/utils/file-uploader.ts';
   import { isAlbumsRoute, isLockedFolderRoute } from '#lib/utils/navigation.ts';
   import { getUploadAlbumId } from '#lib/utils/upload-album.ts';
-  import { Icon, Logo, modalManager } from '@immich/ui';
-  import { mdiFolderUploadOutline } from '@mdi/js';
+  import type { UploadLibraryResponseDto } from '@immich/sdk';
+  import { Icon, Logo, toastManager } from '@immich/ui';
+  import { mdiFolderLockOutline, mdiFolderUploadOutline } from '@mdi/js';
   import { createQuery } from '@tanstack/svelte-query';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -30,28 +36,57 @@
     ...getUploadLibrariesQuery(),
     enabled: authManager.authenticated && !authManager.isSharedLink,
   }));
-  const canUploadFolders = $derived(
-    !albumId && !isInLockedFolder && !authManager.isSharedLink && (uploadLibrariesQuery.data?.length ?? 0) > 0,
-  );
+  const canUploadIntoLibraries = $derived(!albumId && !isInLockedFolder && !authManager.isSharedLink);
+
+  const toLibraryTarget = (library?: UploadLibraryResponseDto): UploadDropTarget | undefined =>
+    library && { label: library.name, writable: true, libraryId: library.id, destination: '' };
+
+  const libraryTarget = $derived(toLibraryTarget(uploadLibrariesQuery.data?.[0]));
 
   let dragStartTarget: EventTarget | null = $state(null);
+  let dropMatch = $state<UploadDropTargetMatch>();
   let isInternalDrag = false;
 
+  const findDropMatch = (element: EventTarget | null) =>
+    canUploadIntoLibraries
+      ? uploadDropTargetManager.find(element instanceof Element ? element : null, libraryTarget)
+      : undefined;
+
+  const updateDropMatch = (match?: UploadDropTargetMatch) => {
+    dropMatch = match;
+    uploadDropTargetManager.hover(match);
+  };
+
+  const getMatchKey = (match?: UploadDropTargetMatch) =>
+    match && `${match.cardPath ?? ''}|${match.target.label}|${match.target.writable}`;
+
+  const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+
   const onDragEnter = (e: DragEvent) => {
-    if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+    if (isFileDrag(e)) {
       dragStartTarget = e.target;
+      updateDropMatch(findDropMatch(e.target));
     }
   };
 
   const onDragLeave = (e: DragEvent) => {
     if (dragStartTarget === e.target) {
       dragStartTarget = null;
+      updateDropMatch();
     }
   };
 
   const onDrop = async (e: DragEvent) => {
+    const match = findDropMatch(e.target);
     dragStartTarget = null;
-    await handleDataTransfer(e.dataTransfer);
+    updateDropMatch();
+
+    if (match && !match.target.writable) {
+      toastManager.warning($t('upload_target_read_only', { values: { name: match.target.label } }));
+      return;
+    }
+
+    await handleDataTransfer(e.dataTransfer, match?.target);
   };
 
   const onPaste = (event: ClipboardEvent) => {
@@ -59,16 +94,43 @@
       return;
     }
 
-    return handleDataTransfer(event.clipboardData);
+    const match = findDropMatch(null);
+    if (match && !match.target.writable) {
+      toastManager.warning($t('upload_target_read_only', { values: { name: match.target.label } }));
+      return;
+    }
+
+    return handleDataTransfer(event.clipboardData, match?.target);
   };
 
-  const handleDataTransfer = async (dataTransfer?: DataTransfer | null) => {
+  const fetchLibraryTarget = async () => {
+    try {
+      const libraries = await queryClient.fetchQuery(getUploadLibrariesQuery());
+      return toLibraryTarget(libraries[0]);
+    } catch {
+      return;
+    }
+  };
+
+  const resolveTarget = async (target?: UploadDropTarget) =>
+    target ?? (canUploadIntoLibraries ? await fetchLibraryTarget() : undefined);
+
+  const handleDataTransfer = async (dataTransfer?: DataTransfer | null, dropTarget?: UploadDropTarget) => {
     if (!dataTransfer) {
       return;
     }
 
     if (!browserSupportsDirectoryUpload()) {
-      return handleFiles(dataTransfer.files);
+      const plainFiles = Array.from(dataTransfer.files);
+      const target = await resolveTarget(dropTarget);
+      if (target) {
+        await handleUploadDrop(
+          target,
+          plainFiles.map((file) => ({ file, relativePath: file.name })),
+        );
+        return;
+      }
+      return handleFiles(plainFiles);
     }
 
     const entries: FileSystemEntry[] = [];
@@ -87,27 +149,16 @@
     }
 
     const directoryEntries = await getAllFilesFromTransferEntries(entries);
-    const hasDirectory = entries.some((entry) => entry.isDirectory);
-    if (hasDirectory && (await hasWritableLibrary())) {
-      const folderEntries = [...files.map((file) => ({ file, relativePath: file.name })), ...directoryEntries];
-      await modalManager.show(FolderUploadModal, { entries: folderEntries });
+    const target = await resolveTarget(dropTarget);
+    if (target) {
+      await handleUploadDrop(target, [
+        ...files.map((file) => ({ file, relativePath: file.name })),
+        ...directoryEntries,
+      ]);
       return;
     }
 
     return handleFiles([...files, ...directoryEntries.map(({ file }) => file)]);
-  };
-
-  const hasWritableLibrary = async () => {
-    if (authManager.isSharedLink || albumId || isInLockedFolder) {
-      return false;
-    }
-
-    try {
-      const libraries = await queryClient.fetchQuery(getUploadLibrariesQuery());
-      return libraries.length > 0;
-    } catch {
-      return false;
-    }
   };
 
   const browserSupportsDirectoryUpload = () => typeof DataTransferItem.prototype.webkitGetAsEntry === 'function';
@@ -209,33 +260,60 @@
     await onDrop(e);
   };
 
-  const onDragOver = (e: DragEvent) => {
+  const ondragover = (e: DragEvent) => {
+    if (isInternalDrag || !isFileDrag(e)) {
+      return;
+    }
+
     e.preventDefault();
-    e.stopPropagation();
+    const match = findDropMatch(e.target);
+    if (getMatchKey(match) !== getMatchKey(dropMatch)) {
+      updateDropMatch(match);
+    }
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = match && !match.target.writable ? 'none' : 'copy';
+    }
   };
+
+  const isReadOnly = $derived(!!dropMatch && !dropMatch.target.writable);
 </script>
 
 <svelte:window onpaste={onPaste} />
 
-<svelte:body {ondragstart} {ondragend} {ondragenter} {ondragleave} {ondrop} />
+<svelte:body {ondragstart} {ondragend} {ondragenter} {ondragleave} {ondragover} {ondrop} />
 
 {#if dragStartTarget}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="fixed inset-0 z-9999 flex size-full flex-col items-center justify-center bg-gray-100/95 p-6 text-immich-dark-gray dark:bg-immich-dark-bg/95 dark:text-immich-gray"
+    class="pointer-events-none fixed inset-0 z-9999 flex size-full flex-col items-center p-4 text-immich-dark-gray dark:text-immich-gray"
     transition:fade={{ duration: 150 }}
-    ondragover={onDragOver}
     data-testid="drop-overlay"
+    data-read-only={isReadOnly || undefined}
   >
     <div
-      class="pointer-events-none flex size-full flex-col items-center justify-center gap-6 rounded-3xl border-4 border-dashed border-primary bg-primary/5"
+      class="flex size-full flex-col items-center justify-end rounded-3xl border-4 border-dashed p-6 {isReadOnly
+        ? 'border-danger bg-danger/5'
+        : 'border-primary bg-primary/5'}"
     >
-      <Logo variant="icon" size="giant" class="animate-bounce" />
-      <div class="flex items-center gap-3 text-center text-3xl font-medium text-primary">
-        {#if canUploadFolders}
-          <Icon icon={mdiFolderUploadOutline} size="40" />
-          {$t('drop_files_or_folders_to_upload')}
+      <div
+        class="flex max-w-full items-center gap-3 rounded-2xl bg-light px-6 py-4 text-center text-xl font-medium shadow-lg md:text-2xl {isReadOnly
+          ? 'text-danger'
+          : 'text-primary'}"
+        role="status"
+        data-testid="drop-overlay-message"
+        data-target={dropMatch?.target.label}
+      >
+        {#if dropMatch && isReadOnly}
+          <Icon icon={mdiFolderLockOutline} size="32" />
+          <span class="min-w-0 wrap-break-word">
+            {$t('upload_target_read_only', { values: { name: dropMatch.target.label } })}
+          </span>
+        {:else if dropMatch}
+          <Icon icon={mdiFolderUploadOutline} size="32" />
+          <span class="min-w-0 wrap-break-word">
+            {$t('drop_to_upload_to', { values: { name: dropMatch.target.label } })}
+          </span>
         {:else}
+          <Logo variant="icon" size="medium" />
           {$t('drop_files_to_upload')}
         {/if}
       </div>

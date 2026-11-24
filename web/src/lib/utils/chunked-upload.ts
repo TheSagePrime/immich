@@ -278,7 +278,8 @@ export const openFolderPicker = () =>
     input.click();
   });
 
-const isHiddenPath = (relativePath: string) => relativePath.split('/').some((segment) => segment.startsWith('.'));
+export const isHiddenPath = (relativePath: string) =>
+  relativePath.split('/').some((segment) => segment.startsWith('.'));
 
 export const filterUploadableEntries = (entries: FolderUploadEntry[], extensions: string[]) => {
   const lowerExtensions = extensions.map((extension) => extension.toLowerCase());

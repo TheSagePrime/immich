@@ -107,7 +107,9 @@
     if (!libraryId) {
       return;
     }
-    folderUploadManager.start({ libraryId, destination, duplicatePolicy, entries: filtered.accepted });
+    const targetLabel =
+      destination.split('/').findLast(Boolean) ?? libraries.find((library) => library.id === libraryId)?.name;
+    folderUploadManager.start({ libraryId, destination, duplicatePolicy, entries: filtered.accepted, targetLabel });
     onClose(true);
   };
 </script>
