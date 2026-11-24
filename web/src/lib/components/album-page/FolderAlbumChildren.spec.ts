@@ -40,7 +40,7 @@ test('opens a child album on click', async ({ router }) => {
   const album = factory.album({ albumName: 'day 1', isFolderAlbum: true });
   const { baseElement } = await render(FolderAlbumChildren, { albums: [album] });
 
-  baseElement.querySelector<HTMLButtonElement>('[data-testid="folder-card"] button')!.click();
+  baseElement.querySelector<HTMLButtonElement>(':scope [data-testid="folder-card"] button')!.click();
 
   await expect.poll(() => router.url.pathname).toBe(Route.viewAlbum(album));
 });
