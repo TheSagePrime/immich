@@ -37,7 +37,11 @@ const SubtitleFormatSchema = z.enum(SubtitleFormat).describe('Format of the subt
 
 const SubtitleResponseSchema = z
   .object({
-    name: z.string().describe('File name of the subtitle, used to fetch it'),
+    name: z
+      .string()
+      .describe(
+        'File name of the subtitle, used to fetch it. Shared links that hide metadata get the name without the base name of the video, for example ".en.srt"',
+      ),
     format: SubtitleFormatSchema,
     language: z.string().nullable().describe('BCP 47 language tag parsed from the file name, if any'),
     label: z.string().nullable().describe('Extra text from the file name besides the language, if any'),

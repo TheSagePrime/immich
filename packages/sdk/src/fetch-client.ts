@@ -1492,7 +1492,7 @@ export type SubtitleResponseDto = {
     label: string | null;
     /** BCP 47 language tag parsed from the file name, if any */
     language: string | null;
-    /** File name of the subtitle, used to fetch it */
+    /** File name of the subtitle, used to fetch it. Shared links that hide metadata get the name without the base name of the video, for example ".en.srt" */
     name: string;
 };
 export type SignUpDto = {

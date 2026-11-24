@@ -179,6 +179,27 @@ describe(VideoLibraryService.name, () => {
       );
     });
 
+    it('should hide the video file name from shared links that hide metadata', async () => {
+      const id = factory.uuid();
+      const auth = {
+        ...authStub.adminSharedLink,
+        sharedLink: { ...authStub.adminSharedLink.sharedLink!, showExif: false },
+      };
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([id]));
+      mocks.asset.getForVideo.mockResolvedValue({ originalPath: join(directory, 'movie.mp4'), encodedVideoPath: null });
+      await writeFile(join(directory, 'movie.en.srt'), '1\n00:00:01,000 --> 00:00:02,000\nHello\n');
+      await writeFile(join(directory, 'movie.vtt'), 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHi\n');
+
+      const subtitles = await sut.getSubtitles(auth, id);
+      expect(subtitles.map(({ name }) => name).toSorted()).toEqual(['.en.srt', '.vtt']);
+      expect(JSON.stringify(subtitles)).not.toContain('movie');
+      await expect(sut.getSubtitle(auth, id, '.en.srt')).resolves.toBe(
+        'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello\n',
+      );
+      await expect(sut.getSubtitle(auth, id, '..')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(sut.getSubtitle(auth, id, './../movie.en.srt')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('should reject assets that are not videos', async () => {
       const id = factory.uuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([id]));

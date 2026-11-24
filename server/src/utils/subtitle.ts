@@ -36,13 +36,23 @@ const toLanguageTag = (token: string): string | null => {
   }
 };
 
+const getVideoBase = (videoPath: string) => basename(videoPath, extname(videoPath));
+
+export const hideSubtitleBaseName = (videoPath: string, name: string): string => {
+  const videoBase = getVideoBase(videoPath);
+  return name.startsWith(videoBase) ? name.slice(videoBase.length) : name;
+};
+
+const restoreSubtitleBaseName = (videoPath: string, name: string): string =>
+  name.startsWith('.') ? `${getVideoBase(videoPath)}${name}` : name;
+
 export const matchSubtitleFileName = (videoPath: string, fileName: string): SubtitleCandidate | null => {
   const format = getSubtitleFormat(fileName);
   if (!format) {
     return null;
   }
 
-  const videoBase = basename(videoPath, extname(videoPath));
+  const videoBase = getVideoBase(videoPath);
   const subtitleBase = fileName.slice(0, -extname(fileName).length);
   if (subtitleBase === videoBase) {
     return { name: fileName, format, suffix: '' };
@@ -232,7 +242,7 @@ export const sanitizeVtt = (input: string): string => {
 };
 
 export const readSidecarSubtitle = async (videoPath: string, name: string): Promise<string> => {
-  const candidate = matchSubtitleFileName(videoPath, name);
+  const candidate = matchSubtitleFileName(videoPath, restoreSubtitleBaseName(videoPath, name));
   if (!candidate) {
     throw new NotFoundException('Subtitle not found');
   }

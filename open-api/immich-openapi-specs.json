@@ -5264,7 +5264,7 @@
     },
     "/assets/{id}/subtitles/{name}": {
       "get": {
-        "description": "Get a sidecar subtitle of a video as WebVTT. SubRip (.srt) files are converted on the fly.",
+        "description": "Get a sidecar subtitle of a video as WebVTT. SubRip (.srt) files are converted on the fly. The name may omit the base name of the video, for example \".en.srt\".",
         "operationId": "getSubtitle",
         "parameters": [
           {
@@ -32534,7 +32534,7 @@
             "type": "string"
           },
           "name": {
-            "description": "File name of the subtitle, used to fetch it",
+            "description": "File name of the subtitle, used to fetch it. Shared links that hide metadata get the name without the base name of the video, for example \".en.srt\"",
             "type": "string"
           }
         },

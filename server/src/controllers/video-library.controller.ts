@@ -74,10 +74,12 @@ export class VideoLibraryController {
   @Authenticated({ permission: Permission.AssetView, sharedLink: true })
   @Header('Content-Type', 'text/vtt; charset=utf-8')
   @Header('Cache-Control', 'private, no-cache')
+  @Header('X-Content-Type-Options', 'nosniff')
   @ApiOkResponse({ content: { 'text/vtt': { schema: { type: 'string' } } } })
   @Endpoint({
     summary: 'Get sidecar subtitle',
-    description: 'Get a sidecar subtitle of a video as WebVTT. SubRip (.srt) files are converted on the fly.',
+    description:
+      'Get a sidecar subtitle of a video as WebVTT. SubRip (.srt) files are converted on the fly. The name may omit the base name of the video, for example ".en.srt".',
     history: history(),
   })
   getSubtitle(@Auth() auth: AuthDto, @Param() { id, name }: SubtitleParamDto): Promise<string> {

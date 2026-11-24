@@ -231,6 +231,25 @@ describe('/video-library', () => {
       expect(positionStatus).toBe(403);
     });
 
+    it('should not reveal the video file name to shared links that hide metadata', async () => {
+      const sharedLink = await utils.createSharedLink(admin.accessToken, {
+        type: SharedLinkType.Individual,
+        assetIds: [videoId],
+        showMetadata: false,
+      });
+
+      const { status, body } = await request(app).get(`/assets/${videoId}/subtitles`).query({ key: sharedLink.key });
+      expect(status).toBe(200);
+      expect(body.map(({ name }: { name: string }) => name).toSorted()).toEqual(['.de.forced.vtt', '.en.srt']);
+      expect(JSON.stringify(body)).not.toContain('movie');
+
+      const { status: fileStatus, text } = await request(app)
+        .get(`/assets/${videoId}/subtitles/.en.srt`)
+        .query({ key: sharedLink.key });
+      expect(fileStatus).toBe(200);
+      expect(text).toContain('Hello');
+    });
+
     it('should not serve subtitles of a video that is not in the shared link', async () => {
       const sharedLink = await utils.createSharedLink(admin.accessToken, {
         type: SharedLinkType.Individual,

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AuthDto } from 'src/dtos/auth.dto.js';
+import { AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import {
   PlaybackPositionResponseDto,
   PlaybackPositionUpdateDto,
@@ -7,7 +7,7 @@ import {
 } from 'src/dtos/video-library.dto.js';
 import { Permission } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
-import { findSidecarSubtitles, readSidecarSubtitle } from 'src/utils/subtitle.js';
+import { findSidecarSubtitles, hideSubtitleBaseName, readSidecarSubtitle } from 'src/utils/subtitle.js';
 
 type PlaybackPositionRow = {
   assetId: string;
@@ -59,7 +59,12 @@ export class VideoLibraryService extends BaseService {
   async getSubtitles(auth: AuthDto, id: string): Promise<SubtitleResponseDto[]> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
     const { originalPath } = await this.requireVideo(id);
-    return findSidecarSubtitles(originalPath);
+    const subtitles = await findSidecarSubtitles(originalPath);
+    if (!isMetadataHidden(auth)) {
+      return subtitles;
+    }
+
+    return subtitles.map((subtitle) => ({ ...subtitle, name: hideSubtitleBaseName(originalPath, subtitle.name) }));
   }
 
   async getSubtitle(auth: AuthDto, id: string, name: string): Promise<string> {
